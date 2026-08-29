@@ -119,7 +119,7 @@ button.ghost span:last-child { color: var(--faint); }
 .balance .side b { font-size: 30px; }
 .balance .side span { display: block; font-size: 11px; color: var(--dim); font-weight: 600; letter-spacing: .08em; text-transform: uppercase; }
 .balance .note { font-size: 11px; color: var(--dim); margin-top: 4px; }
-#cueline { min-height: 22px; text-align: center; color: var(--brand2); font-weight: 600; margin: 8px 0 2px; }
+#cueline { min-height: 22px; color: var(--brand2); font-weight: 600; margin: 8px 0 2px; max-width: 220px; }
 .controls { display: flex; align-items: center; justify-content: center; gap: 26px; margin-top: 6px; }
 .controls .aux {
   width: 52px; height: 52px; border-radius: 50%; border: 1px solid var(--line);
@@ -261,7 +261,10 @@ button.ghost span:last-child { color: var(--faint); }
       <div class="note" style="text-align:center" id="balNote">&nbsp;</div>
     </div>
   </div>
-  <div id="cueline">&nbsp;</div>
+  <div style="display:flex;align-items:center;justify-content:center;gap:10px">
+    <div id="runBot"></div>
+    <div id="cueline" style="text-align:left">&nbsp;</div>
+  </div>
   <div class="controls">
     <button class="aux" id="recBtn" title="record fixture"></button>
     <button id="stopBtn"></button>
@@ -283,6 +286,7 @@ button.ghost span:last-child { color: var(--faint); }
 <section class="screen" id="coach">
   <div class="eyebrow brand" style="margin:6px 0 4px">Coach</div>
   <h2 style="margin:0 0 14px;font-size:26px;letter-spacing:-.02em">What I listen for</h2>
+  <div id="coachBot" style="display:grid;place-items:center;margin:2px 0 14px"></div>
   <div class="card" id="cueList"></div>
   <p style="color:var(--faint);font-size:12px;margin-top:14px">
     One cue at a time. A fault has to persist 8 seconds before I speak, and I never
@@ -453,7 +457,7 @@ setInterval(() => {
   const m = analyze(activeSamples());
   drawWave();
 
-  if (!m.moving) { setDial(null); $('score').textContent = '—'; return; }
+  if (!m.moving) { setDial(null); $('score').textContent = '—'; runBot.state('listening'); return; }
 
   const sc = score(m);
   session.tick(now, m, sc);
@@ -472,8 +476,12 @@ setInterval(() => {
     $('balNote').textContent = bias < 4 ? 'Even' : `+${bias}% ${L > 50 ? 'left' : 'right'} bias`;
   }
 
+  const bad = coach.faults(m);
+  runBot.state(bad.length ? 'suspicious' : (sc >= 85 ? 'happy' : 'working'));
+
   const cue = coach.update(m, now);
   if (cue) {
+    runBot.state('alerting');
     session.cue(now, cue.fault);
     $('cueline').textContent = cue.text;
     if (voiceOn) say(cue.text, cue.fault);
@@ -498,6 +506,7 @@ $('startBtn').onclick = async () => {
 };
 $('stopBtn').onclick = () => {
   running = false;
+  runBot.state('sleeping');
   removeEventListener('devicemotion', onMotion);
   wakeLock?.release(); wakeLock = null;
   const run = session.stop();
@@ -683,6 +692,13 @@ $('recBtn').innerHTML = ICON.record;
 $('voiceBtn').innerHTML = ICON.sound;
 $('backBtn').innerHTML = ICON.back;
 $('shareBtn').innerHTML = ICON.share;
+
+// the coach's face
+let runBot = { state() {} }, coachBot = { state() {} };
+import('./bot.js').then(({ mountBot }) => {
+  runBot = mountBot($('runBot'), { size: 64 });
+  coachBot = mountBot($('coachBot'), { size: 190 });
+}).catch(() => {});
 
 // 3D pods — decorative, so a WebGL failure must never take the app down
 let heroPodStop = null;
