@@ -155,6 +155,22 @@ worked rather than a claim that it might.
 
 ---
 
+## Live telemetry
+
+While anyone is running, their phone streams a metrics window to the server every
+ten seconds. Any laptop — or any Claude session — can watch and analyse mid-run:
+
+```bash
+curl https://form-coach-production.up.railway.app/telemetry            # who has data
+curl https://form-coach-production.up.railway.app/telemetry/1          # runner 1, full JSONL
+curl "https://form-coach-production.up.railway.app/telemetry/1?latest=1"  # newest snapshot
+```
+
+Each line carries runner, mode, distance, recent cues and a 12-second metric window.
+Paste a stream into a Claude session and ask it to tune `CONFIG` — that is the
+intended workflow while the runner is still on the track. Storage is ephemeral by
+design: it is race telemetry, not a system of record.
+
 ## Running it yourself
 
 ```bash
@@ -180,5 +196,6 @@ in the first version instead of a later one.
 | `voice.js` | The only thing that makes noise. Native speech when the shell is present, `speechSynthesis` otherwise. |
 | `ios/` | The native shell. One Swift file and an XcodeGen config. |
 | `replay.js` | The checks. |
-| `server.js` | Static file server, `node:http` only. |
-| `PLAN.md` | Team plan and the reasoning behind the architecture. |
+| `server.js` | Static files plus the telemetry drop-box, `node:http` only. |
+| `session.js` | GPS distance, per-second timeline, telemetry beacon, per-runner history. |
+| `PLAN.md` | Team plan, agent-ready track briefs, architecture reasoning. |
