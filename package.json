@@ -2,6 +2,10 @@
   "name": "run-coach",
   "type": "module",
   "scripts": {
+    "start": "node server.js",
     "check": "node replay.js"
+  },
+  "engines": {
+    "node": ">=22"
   }
 }
