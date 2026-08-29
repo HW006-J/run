@@ -5,6 +5,8 @@ reach, and speaks one correction at a time while you run.
 
 RUN/HACK, London Stadium, Sat 29 Aug. Hands in 18:00.
 
+Live: https://form-coach-production.up.railway.app
+
 ## The one architectural decision
 
 **No native app on the critical path, and no server.**
@@ -56,10 +58,12 @@ reasoning about it.
 ## Deploy
 
 ```
-vercel --prod        # static, no config, no build step
+railway up           # served by server.js, no build step
 ```
 
-Must be HTTPS. iOS refuses motion sensors otherwise.
+Live at https://form-coach-production.up.railway.app
+
+Must be HTTPS. iOS refuses motion sensors otherwise, and Railway gives it for free.
 
 ## CI, such as it is
 
