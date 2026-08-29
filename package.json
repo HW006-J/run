@@ -1,0 +1,7 @@
+{
+  "name": "run-coach",
+  "type": "module",
+  "scripts": {
+    "check": "node replay.js"
+  }
+}

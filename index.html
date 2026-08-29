@@ -1,0 +1,160 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>Form Coach</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; min-height: 100svh; background: #0a0a0c; color: #f2f2f4;
+    font: 16px/1.4 -apple-system, system-ui, sans-serif;
+    display: flex; flex-direction: column; padding: max(1rem, env(safe-area-inset-top)) 1rem 1.5rem;
+    -webkit-user-select: none; user-select: none;
+  }
+  h1 { font-size: .8rem; letter-spacing: .18em; text-transform: uppercase; color: #6c6c78; margin: 0 0 auto; font-weight: 600; }
+  button {
+    font: inherit; font-weight: 600; color: inherit; background: #1b1b20;
+    border: 1px solid #2e2e36; border-radius: 14px; padding: 1rem; width: 100%;
+  }
+  button:active { background: #26262e; }
+  #go { background: #2f6df6; border-color: #2f6df6; font-size: 1.15rem; padding: 1.4rem; }
+  #go.on { background: #1b1b20; border-color: #2e2e36; }
+
+  #cue { font-size: 2rem; font-weight: 650; line-height: 1.15; min-height: 4.6rem; margin: 1.5rem 0; }
+  #cue.idle { color: #4a4a55; font-weight: 500; font-size: 1.3rem; }
+
+  .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: .6rem; margin-bottom: 1.2rem; }
+  .stat { background: #131318; border: 1px solid #212129; border-radius: 14px; padding: .8rem .7rem; }
+  .stat b { display: block; font-size: 2.1rem; font-weight: 640; font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
+  .stat span { font-size: .68rem; letter-spacing: .1em; text-transform: uppercase; color: #6c6c78; }
+  .stat.bad { border-color: #7a2f2f; background: #1d1214; }
+  .stat.bad b { color: #ff7a6e; }
+
+  .row { display: flex; gap: .6rem; }
+  footer { margin-top: 1rem; font-size: .78rem; color: #55555f; text-align: center; min-height: 1.2rem; }
+  a { color: #55555f; }
+</style>
+
+<h1>Form Coach</h1>
+
+<div id="cue" class="idle">Phone in your hand or an armband. Tap start, then run.</div>
+
+<div class="grid">
+  <div class="stat" id="s-cadence"><b>—</b><span>Cadence</span></div>
+  <div class="stat" id="s-bounce"><b>—</b><span>Bounce</span></div>
+  <div class="stat" id="s-asym"><b>—</b><span>Balance</span></div>
+</div>
+
+<button id="go">Start</button>
+<div class="row" style="margin-top:.6rem">
+  <button id="rec">Record</button>
+  <button id="save" disabled>Export</button>
+</div>
+<footer id="note"></footer>
+
+<script type="module">
+import { analyze, Coach, CONFIG } from './coach.js';
+import { say, unlock } from './voice.js';
+
+const $ = id => document.getElementById(id);
+const note = m => $('note').textContent = m;
+
+let samples = [];          // rolling window
+let tape = null, recording = false;   // full session when recording
+let coach = null, t0 = 0, running = false, wakeLock = null;
+
+// --- sensor ---------------------------------------------------------------
+function onMotion(e) {
+  const a = e.acceleration, g = e.accelerationIncludingGravity;
+  if (!a || a.x === null || !g) return;
+  const s = { t: performance.now() - t0, ax: a.x, ay: a.y, az: a.z, gx: g.x, gy: g.y, gz: g.z };
+  samples.push(s);
+  if (recording) tape.push(s);
+  const cutoff = s.t - CONFIG.windowSec * 1000;
+  while (samples.length && samples[0].t < cutoff) samples.shift();
+}
+
+// --- loop -----------------------------------------------------------------
+const fmt = (v, d = 0) => v == null ? '—' : v.toFixed(d);
+function paint(m, bad) {
+  $('s-cadence').firstChild.textContent = fmt(m.cadence);
+  $('s-bounce').firstChild.textContent = fmt(m.bounce, 1);
+  $('s-asym').firstChild.textContent = m.asymmetry == null ? '—' : Math.round(100 - m.asymmetry * 100) + '%';
+  for (const [k, id] of [['cadence','s-cadence'],['bounce','s-bounce'],['asymmetry','s-asym']])
+    $(id).classList.toggle('bad', bad.includes(k));
+}
+
+setInterval(() => {
+  if (!running) return;
+  const now = (performance.now() - t0) / 1000;
+  const m = analyze(samples);
+
+  if (!m.moving) {
+    paint({}, []);
+    $('cue').className = 'idle';
+    $('cue').textContent = samples.length < 32 ? 'Waiting for sensor…' : 'Start running.';
+    return;
+  }
+
+  const bad = coach.faults(m);
+  paint(m, bad);
+
+  const cue = coach.update(m, now);
+  if (cue) {
+    $('cue').className = '';
+    $('cue').textContent = cue.text;
+    say(cue.text);
+  } else if (!bad.length) {
+    $('cue').className = 'idle';
+    $('cue').textContent = 'Form looks good.';
+  }
+}, 1000);
+
+// --- controls -------------------------------------------------------------
+$('go').onclick = async () => {
+  if (running) {
+    running = false;
+    removeEventListener('devicemotion', onMotion);
+    wakeLock?.release(); wakeLock = null;
+    $('go').textContent = 'Start'; $('go').classList.remove('on');
+    $('cue').className = 'idle'; $('cue').textContent = 'Stopped.';
+    return;
+  }
+
+  if (typeof DeviceMotionEvent?.requestPermission === 'function') {
+    if (await DeviceMotionEvent.requestPermission() !== 'granted')
+      return note('Motion access denied. Settings > Safari > Motion & Orientation Access.');
+  }
+  try { wakeLock = await navigator.wakeLock.request('screen'); } catch {}
+
+  unlock();                      // iOS only allows speech from a user gesture
+  samples = []; coach = new Coach(); t0 = performance.now(); running = true;
+  addEventListener('devicemotion', onMotion);
+  $('go').textContent = 'Stop'; $('go').classList.add('on');
+  note('');
+};
+
+$('rec').onclick = () => {
+  recording = !recording;
+  if (recording) tape = [];
+  $('rec').textContent = recording ? 'Recording…' : 'Record';
+  $('save').disabled = recording || !tape?.length;
+};
+
+$('save').onclick = () => {
+  const blob = new Blob([tape.map(s => JSON.stringify(s)).join('\n')], { type: 'application/x-ndjson' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `run-${new Date().toISOString().slice(11, 19).replace(/:/g, '')}.jsonl`;
+  a.click();
+  note(`${tape.length} samples exported — drop it in fixtures/`);
+  tape = null; $('save').disabled = true;
+};
+
+// keep the sensor alive if iOS backgrounds and returns
+addEventListener('visibilitychange', async () => {
+  if (document.visibilityState === 'visible' && running && !wakeLock)
+    try { wakeLock = await navigator.wakeLock.request('screen'); } catch {}
+});
+</script>
