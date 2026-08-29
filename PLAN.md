@@ -87,7 +87,7 @@ Skipped GitHub Actions. Add it if a judge asks to see a green tick.
 The core is done, so these run in parallel. Each owns its own files. The only shared
 file is `index.html`, and each track touches at most two lines of it.
 
-### Track A — AirPods
+### Track A — AirPods · built, see ios/
 
 The reason the project exists.
 

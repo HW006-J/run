@@ -33,6 +33,7 @@ One inertial sensor, projected onto gravity so it does not care how you hold the
 | **Cadence** | Autocorrelation of vertical acceleration, sub-sample interpolated | Under about 162 steps per minute means you are overstriding and braking on every step. It is the single most correctable fault in distance running. |
 | **Bounce** | RMS vertical acceleration | Energy going up instead of forward. |
 | **Balance** | Alternating footfall peaks compared | A persistent left/right mismatch is how running injuries announce themselves. |
+| **Head** *(AirPods only)* | Principal axes of horizontal acceleration | How much of your movement is *across* the direction of travel instead of along it. A hand cannot tell you this, because the arm swing is the lateral motion. A head can. |
 
 ### It does not nag
 
@@ -54,10 +55,14 @@ to ask for one.
 
 So the two modes became:
 
-- **Ears.** Head-mounted IMU. Head bob, lateral sway, torso stability. Nothing on the
-  market coaches you from the head.
-- **Hand.** AirPods in your ears for the audio, phone gripped in one hand for arm swing.
-  Cross-body arm swing is common, costly and correctable.
+- **AirPods.** Head-mounted IMU, roughly 25 Hz, one bud at a time. It measures the thing
+  nothing else can: whether your head stays pointed where you are going. We take the
+  principal axis of horizontal acceleration, which is fore-aft by definition when you
+  are running forwards, and the ratio to the other axis is your wobble. No compass
+  required.
+- **Phone in hand.** Held or strapped on. Cadence, bounce and left/right balance.
+
+Both modes are in the app. Tap between them.
 
 ## The thing we decided
 
@@ -80,12 +85,14 @@ and injects head samples through it. The page works on its own without it.
 
 ## What is real and what is not
 
-Real: the signal processing, the cue policy, the app, the offline behaviour, the
-recorder, the checks. All of it runs, on a phone, right now, at the link above.
+Real: the signal processing, the cue policy, the web app, the offline behaviour, the
+recorder, the checks, and the native AirPods shell. The web app runs on any phone at
+the link above. AirPods mode needs the app in `ios/` on a real device, because a
+simulator has no buds to read.
 
-Not yet real: the AirPods head stream needs the native shell (Track A). The voice is
-the phone's built-in synthesis, not ElevenLabs (Track B). Every threshold in `CONFIG`
-is an informed guess that wants tuning against recorded runs.
+Not yet real: the voice is the phone's built-in synthesis, not ElevenLabs (Track B).
+Session review is not built (Track C). Every threshold in `CONFIG` is an informed
+guess that wants tuning against recorded runs.
 
 We would rather tell you that than have you find it.
 
@@ -96,17 +103,32 @@ We would rather tell you that than have you find it.
 The core is finished, so these run in parallel. Each owns its own files, and each one
 touches at most two lines of `index.html`, so nobody blocks anybody.
 
-### Track A — AirPods
+### Track A — AirPods · **built**
 
-A SwiftUI app that is a `WKWebView` pointed at the deployed URL, plus
-`CMHeadphoneMotionManager` feeding samples in through `evaluateJavaScript`. Around 100
-lines. It adds a sensor and reimplements nothing.
+`ios/FormCoach/FormCoach.swift`, one file. A `WKWebView` holding the same page you can
+open in Safari, plus the two things a browser cannot do:
 
-Contract: call `window.__head(sample)` with the same `{t,ax,ay,az,gx,gy,gz}` shape the
-page already uses.
+- `CMHeadphoneMotionManager` feeding head samples into `window.__head()` through
+  `evaluateJavaScript`, converted from g to m/s² so they are the same shape the phone
+  already produces.
+- `AVSpeechSynthesizer` behind a `say` message handler, on a `.playback` audio session
+  with `duckOthers`, so cues keep coming with the screen off and cut through your music
+  instead of stopping it.
 
-First thing to do: turn **off** Automatic Ear Detection, or the motion stream dies the
+The page is bundled inside the app too, so a cold start with no signal still works.
+
+```bash
+brew install xcodegen
+cd ios && xcodegen generate && open FormCoach.xcodeproj
+```
+
+Run it on a **real device**; a simulator has no buds. Set your signing team in Xcode.
+Then turn **off** Automatic Ear Detection in Settings, or the motion stream dies the
 moment a pod leaves an ear.
+
+Still open: the head stream is roughly 25 Hz, which is coarse for cadence, and the neck
+damps the impact spike. Cadence from the head will want its own thresholds. That is
+what the recorder is for.
 
 ### Track B — Voice
 
@@ -154,7 +176,9 @@ in the first version instead of a later one.
 |---|---|
 | `coach.js` | All the analysis and the cue policy. Pure, no dependencies, runs identically in the browser and in node. |
 | `index.html` | The app. Sensor, live readout, cues, session recorder. |
-| `voice.js` | The only thing that makes noise. One seam, so Track B never touches the app. |
+| `head.js` | The AirPods stream. Empty in a normal browser; filled by the native shell. |
+| `voice.js` | The only thing that makes noise. Native speech when the shell is present, `speechSynthesis` otherwise. |
+| `ios/` | The native shell. One Swift file and an XcodeGen config. |
 | `replay.js` | The checks. |
 | `server.js` | Static file server, `node:http` only. |
 | `PLAN.md` | Team plan and the reasoning behind the architecture. |
