@@ -16,6 +16,22 @@ export class Session {
   constructor(mode) {
     this.mode = mode;
     this.user = activeUser();
+
+    // Live telemetry to the server every 10s so a teammate (or a Claude session) can
+    // watch and tune mid-run: curl <site>/telemetry/<runner>. Fire and forget — a
+    // dead spot on the back straight must never touch the run.
+    this._tel = setInterval(() => {
+      const recent = this.timeline.slice(-12);
+      if (!recent.length) return;
+      const body = JSON.stringify({
+        user: this.user, mode: this.mode, at: this.startedAt,
+        km: +this.km.toFixed(2), cues: this.cues.slice(-5), window: recent,
+      });
+      try {
+        navigator.sendBeacon?.(`/telemetry/${this.user}`, body) ||
+          fetch(`/telemetry/${this.user}`, { method: 'POST', body, keepalive: true }).catch(() => {});
+      } catch {}
+    }, 10000);
     this.startedAt = Date.now();
     this.timeline = [];      // one entry/sec: {t, cadence, bounce, impact, asym, sway, score}
     this.cues = [];          // {t, fault}
@@ -51,6 +67,7 @@ export class Session {
   cue(t, fault) { this.cues.push({ t: Math.round(t), fault }); }
 
   stop() {
+    clearInterval(this._tel);
     if (this._watch != null) navigator.geolocation?.clearWatch(this._watch);
     const moving = this.timeline.filter(x => x.score != null);
     const avg = k => {
