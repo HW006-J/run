@@ -13,6 +13,7 @@ targets:
       - { path: ../coach.js,   buildPhase: resources }
       - { path: ../voice.js,   buildPhase: resources }
       - { path: ../head.js,    buildPhase: resources }
+      - { path: ../session.js, buildPhase: resources }
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: app.formcoach.FormCoach
