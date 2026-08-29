@@ -1,0 +1,23 @@
+name: FormCoach
+options:
+  bundleIdPrefix: app.formcoach
+  deploymentTarget: { iOS: "17.0" }
+targets:
+  FormCoach:
+    type: application
+    platform: iOS
+    sources:
+      - path: FormCoach
+      # the web app, bundled so a cold start with no signal still works
+      - { path: ../index.html, buildPhase: resources }
+      - { path: ../coach.js,   buildPhase: resources }
+      - { path: ../voice.js,   buildPhase: resources }
+      - { path: ../head.js,    buildPhase: resources }
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: app.formcoach.FormCoach
+        INFOPLIST_FILE: FormCoach/Info.plist
+        GENERATE_INFOPLIST_FILE: NO
+        TARGETED_DEVICE_FAMILY: 1
+        SWIFT_VERSION: "5.0"
+        CODE_SIGN_STYLE: Automatic

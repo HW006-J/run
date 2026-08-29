@@ -7,14 +7,14 @@
 // This is how you develop the coach on a laptop while a teammate is on the track.
 
 import { readdirSync, readFileSync } from 'node:fs';
-import { analyze, Coach, CONFIG } from './coach.js';
+import { analyze, Coach, CONFIG, FAULTS } from './coach.js';
 
 const G = 9.81;
 
 // A footfall is a sharp spike, not a sine. Model it as a narrow pulse per step so
 // the synthetic trace has the same harmonic structure as a real one.
 // `bounce` is a peak amplitude; the resulting RMS lands at roughly 0.6x it.
-function synth({ spm, bounce = 10, asym = 0, sec = 30, fs = 60 }) {
+function synth({ spm, bounce = 10, asym = 0, lateral = 0.15, sec = 30, fs = 60 }) {
   const s = [];
   const stepHz = spm / 60;
   for (let i = 0; i < sec * fs; i++) {
@@ -26,10 +26,12 @@ function synth({ spm, bounce = 10, asym = 0, sec = 30, fs = 60 }) {
     const spike = Math.exp(-Math.pow((phase - 0.1) / 0.08, 2));
     const vert = bounce * gain * (2.2 * spike - 0.55 - 0.9 * Math.cos(2 * Math.PI * phase));
     const fore = 0.4 * bounce * Math.sin(2 * Math.PI * phase);
+    // head sway is a stride-rate wobble, so half the step rate
+    const side = lateral * 0.4 * bounce * Math.sin(Math.PI * t * stepHz * 2 / 2);
     s.push({
       t: i * 1000 / fs,
-      ax: fore, ay: 0, az: vert,
-      gx: fore, gy: 0, gz: vert + G,
+      ax: fore, ay: side, az: vert,
+      gx: fore, gy: side, gz: vert + G,
     });
   }
   return s;
@@ -62,13 +64,20 @@ for (const spm of [155, 170, 185]) {
   ok('asymmetry: limp is flagged', limp.asymmetry > CONFIG.asymmetryMax, `${limp.asymmetry?.toFixed(3)}`);
 }
 
+{
+  const steady = analyze(synth({ spm: 175, lateral: 0.15 }));
+  const wobble = analyze(synth({ spm: 175, lateral: 1.4 }));
+  ok('sway: steady head is under the limit', steady.sway < CONFIG.swayMax, `${steady.sway?.toFixed(3)}`);
+  ok('sway: wobbling head is flagged', wobble.sway > CONFIG.swayMax, `${wobble.sway?.toFixed(3)}`);
+}
+
 ok('standing still is not coached', !analyze(synth({ spm: 170, bounce: 0.3 })).moving);
 
 console.log('\n-- Coach fires the right cue, and does not nag --');
 
 // Slide a 6s window across the trace once per second, exactly as the app does.
-function drive(samples) {
-  const c = new Coach();
+function drive(samples, enabled = FAULTS.ears) {
+  const c = new Coach(CONFIG, enabled);
   const endT = samples[samples.length - 1].t;
   const cues = [];
   for (let now = CONFIG.windowSec; now * 1000 <= endT; now++) {
@@ -91,6 +100,15 @@ function drive(samples) {
 {
   const cues = drive(synth({ spm: 176, bounce: 9, sec: 100 }));
   ok('good form is left alone', cues.length === 0, `${cues.length} cues`);
+}
+
+{
+  const wobbly = synth({ spm: 176, bounce: 9, lateral: 1.4, sec: 100 });
+  const ears = drive(wobbly, FAULTS.ears);
+  const hand = drive(wobbly, FAULTS.hand);
+  ok('sway is coached from the head', ears.some(c => c.fault === 'sway'),
+     ears[0] ? `"${ears[0].text}"` : 'no cue');
+  ok('sway is never coached from a hand', !hand.some(c => c.fault === 'sway'), `${hand.length} cues`);
 }
 
 // Real recordings, once anyone has made one. Export them from the app.
