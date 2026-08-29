@@ -1,10 +1,15 @@
 # Prompt: build "Form Coach" from scratch
 
-You are building a running-form coach for a hackathon, end to end, in one day. AirPods
-and a phone are the sensors; a voice in your ears is the product. This document is the
-complete specification: architecture, algorithms, exact thresholds, UI, native shell,
-deployment and verification. Follow it in order. Commit early — first-commit evidence
-matters at hackathons — and keep every commit deployable.
+You are an autonomous coding agent. Build a running-form coach, end to end, in one
+day. AirPods and a phone are the sensors; a voice in your ears is the product. This
+document is the complete specification: architecture, algorithms, exact thresholds,
+UI, native shell, adaptive music, deployment and verification. Follow it in order.
+
+Ground rules: plain JS and stdlib over frameworks; fewest files possible; every
+commit deployable; verify each stage in a real browser (with simulated sensors)
+before moving on; commit early — first-commit evidence matters at hackathons. When
+this prompt gives a number, use it; when it marks something a calibration knob,
+leave a comment saying so.
 
 ## The product
 
@@ -51,6 +56,7 @@ dies when a pod leaves an ear.
 | `head.js` | AirPods sample buffer; filled by the native shell via `window.__head(sample)` |
 | `bot.js` + `bot-data.js` | Animated mascot face (see Mascot) |
 | `pods3d.js` + `vendor/three*` | Procedural 3D AirPods for the home screen (see 3D) |
+| `music.js` + `vendor/tone*` | Generative soundtrack driven by the live metrics (see Adaptive music) |
 | `server.js` | Static files + telemetry endpoints, `node:http` only |
 | `replay.js` | The entire test suite: `npm run check`, no framework, <1s |
 | `gen-voice.mjs` | One-off build script: renders cue strings to `audio/*.mp3` via ElevenLabs |
@@ -236,6 +242,48 @@ a personal team, install via `xcrun devicectl device install app`. New devices n
 Developer Mode on and one Xcode-GUI run to register (free-team limitation). 7-day
 cert expiry — fine for a hackathon.
 
+## Adaptive music (`music.js`) — the run generates its soundtrack
+
+A generative layer where form drives the music. Prior art says: Spotify Running died
+switching between licensed tracks; Weav Run got it right by recomposing one piece
+from stems. We synthesize everything, so there are no assets, no licensing and no
+time-stretching.
+
+**Engine**: Tone.js (MIT, vendored like three.js). All scheduling on one
+`Tone.Transport` (it implements lookahead scheduling internally). Genre: lo-fi trap
+at **half-time** — cadence 150–190 spm → `bpm = spm/2`, clamped 70–100,
+`Transport.bpm.rampTo(bpm, 2)` so it glides, never jumps. Every footfall lands on
+an 8th-note hat. Everything in C minor pentatonic — no wrong notes possible.
+
+**Five `Tone.Loop` layers**: (1) kick+snare boom-bap, always on — the pacemaker;
+(2) hats, 8ths with probabilistic 16ths; (3) 2-bar bass riff C–Eb–G–Bb;
+(4) pad chords Cm7–Abmaj7–Eb–Bb through a lowpass + reverb; (5) reward arp with
+ping-pong delay, unlocked by sustained good form.
+
+**Mapping** (smooth every metric with a ~4 s EMA; apply changes only at bar
+boundaries, except BPM):
+
+| Metric | Musical response |
+|---|---|
+| cadence | Transport BPM, half-time, 2 s ramp |
+| form score | pad filter cutoff 400 Hz–8 kHz; score > 75 adds the 9th to chords |
+| bounce | hat velocity + 16th probability: soft feet = busier, crisper hats |
+| asymmetry | percussion pan drifts ~0.3 toward the weak side — subtle, self-correcting |
+| sway | reverb wet 0.1→0.4: a steady head = a tight mix |
+| score > 80 for 8 bars | arp layer in; out again below 70 (4-bar hysteresis) |
+| cue event | at next bar: duck master −8 dB, two-note sting, hold 1.5 s for the voice, ramp back |
+
+**Anti-annoyance rules**: hysteresis on every threshold, bar-quantized changes, max
+one layer change per 4 bars, rotate bass/arp patterns every 16 bars regardless of
+metrics so a steady runner still gets variation. Silence stays an option — music is
+a toggle on the Profile screen, off by default during judging of the voice cues.
+
+**iOS traps**: start the Transport inside the same tap gesture as `unlock()` (`await
+Tone.start()`); set `navigator.audioSession.type = 'playback'` where available or
+loop a silent `<audio>` element so the ring/silent switch doesn't mute WebAudio;
+screen lock suspends WebAudio with no workaround — the wake lock you already hold is
+the mitigation. Duck the music through one master gain the voice path also uses.
+
 ## Checks (`replay.js` — the whole CI)
 
 `npm run check`, plain node, assert-style PASS/FAIL lines, exit 1 on failure:
@@ -281,6 +329,8 @@ snapshots arrived. Screenshot every screen before shipping.
 3. iOS shell → device install. Freeze it; all iteration is now web-only.
 4. Polish UI, mascot, 3D, ElevenLabs, telemetry, users — each its own deployable
    commit.
+4b. Adaptive music: drums+bass against a fake cadence slider first, then wire the
+   real metrics, then the cue duck. Keep it behind a toggle.
 5. Record real fixtures on the track; tune CONFIG from them; lock with asserts.
 
 ## Register of honest limitations (put these in the README)
