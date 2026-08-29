@@ -104,16 +104,24 @@ function drive(samples, enabled = FAULTS.ears) {
 }
 
 {
-  const cues = drive(synth({ spm: 150, sec: 100 }));
+  const cues = drive(synth({ spm: 150, sec: 160 }));
   ok('slow cadence gets coached', cues.length > 0 && cues[0].fault === 'cadence',
      cues[0] ? `first cue at ${cues[0].at}s: "${cues[0].text}"` : 'no cue');
   ok('waits before speaking', !cues.length || cues[0].at >= CONFIG.sustainSec, `at ${cues[0]?.at}s`);
   const gaps = cues.slice(1).map((c, i) => c.at - cues[i].at);
-  ok('respects the cue gap', gaps.every(g => g >= CONFIG.cueGapSec), `gaps ${gaps.join(',') || 'n/a'}`);
+  ok('respects the cue gap', gaps.length > 0 && gaps.every(g => g >= CONFIG.cueGapSec), `gaps ${gaps.join(',') || 'none'}`);
+  const rep = {};
+  let repeatOk = true;
+  for (const c of cues) {
+    if (c.at - (rep[c.fault] ?? -Infinity) < CONFIG.repeatGapSec) repeatOk = false;
+    rep[c.fault] = c.at;
+  }
+  ok('never repeats a fault inside the repeat gap', repeatOk);
+  ok('quiet during the grace period', cues[0].at >= CONFIG.graceSec, `first at ${cues[0].at}s`);
 }
 
 {
-  const cues = drive(synth({ spm: 176, bounce: 9, sec: 100 }));
+  const cues = drive(synth({ spm: 176, bounce: 9, sec: 160 }));
   ok('good form is left alone', cues.length === 0, `${cues.length} cues`);
 }
 

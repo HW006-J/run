@@ -5,22 +5,27 @@
 //   a*       gravity-removed acceleration, m/s^2
 //   g*       acceleration including gravity, m/s^2
 
-// ponytail: every threshold here is a guess until someone runs a lap. Tune on the
-// track, not in a code review. These are the only numbers worth touching.
+// Thresholds anchored where the literature has an anchor (see COACHING.md);
+// the rest are calibration knobs for Track D.
 export const CONFIG = {
   windowSec: 6,
   minCadence: 130,        // autocorrelation search bounds, spm
   maxCadence: 210,
-  lowCadence: 162,        // below this we coach
+  cadenceFloor: 153,      // Garmin red zone: below this is slow for anyone
+  cadenceDrop: 0.95,      // cue when under 95% of the runner's own baseline
   targetLo: 170,
   targetHi: 180,
-  bounceMax: 7.0,         // RMS vertical accel, m/s^2
+  bounceMax: 10.5,        // RMS vertical accel m/s^2 ~ Garmin orange VO (~9.8cm)
   impactMax: 3.0,         // peak vertical accel, g
-  asymmetryMax: 0.15,     // 0..1, alternating step peak mismatch
-  swayMax: 0.62,          // 0..1, head wobble across the direction of travel
+  asymmetryMax: 0.10,     // Robinson-style index; lowest-priority cue
+  swayMax: 0.62,          // fallback until the session baseline exists
+  swaySD: 2,              // after baseline: cue at > mean + 2 SD
   movingRms: 3.0,         // below this they are walking or standing
-  cueGapSec: 20,          // never nag
-  sustainSec: 8,          // fault must persist this long before we speak
+  graceSec: 20,           // say nothing at the start of a run (RunnerUp initialGrace)
+  cueGapSec: 30,          // min between any two cues (RunnerUp cooldown)
+  repeatGapSec: 90,       // min before repeating the same fault: a fix takes ~300 strides
+  sustainSec: 12,         // fault must persist on the smoothed view before we speak
+  smoothTicks: 20,        // cue decisions use a ~20s trimmed mean, not one 6s window
 };
 
 export const G = 9.81;
@@ -179,7 +184,7 @@ export function score(m) {
   if (!m.moving) return null;
   const pen = (v, ok, bad) => v == null ? 0 : Math.max(0, Math.min(1, (v - ok) / (bad - ok)));
   let s = 100;
-  s -= 32 * pen(CONFIG.lowCadence - (m.cadence ?? CONFIG.lowCadence), 0, 25);
+  s -= 32 * pen(CONFIG.targetLo - 8 - (m.cadence ?? CONFIG.targetLo), 0, 25);
   s -= 28 * pen(m.bounce, CONFIG.bounceMax * 0.7, CONFIG.bounceMax * 1.6);
   s -= 24 * pen(m.asymmetry, CONFIG.asymmetryMax * 0.5, CONFIG.asymmetryMax * 2.5);
   s -= 16 * pen(m.sway, CONFIG.swayMax * 0.7, CONFIG.swayMax * 1.4);
@@ -193,23 +198,68 @@ export const FAULTS = {
   ears: ['cadence', 'bounce', 'asymmetry', 'sway'],
 };
 
-// One fault at a time, only once it has persisted, never twice in a row.
+// trimmed mean: drop the top and bottom slice, average the rest
+function tmean(xs, trim = 0.1) {
+  const a = xs.filter(x => x != null).sort((x, y) => x - y);
+  if (!a.length) return null;
+  const k = Math.floor(a.length * trim);
+  const mid = a.slice(k, a.length - k || a.length);
+  return mid.reduce((s, x) => s + x, 0) / mid.length;
+}
+
+// One fault at a time, decided on a smoothed view, never twice in a row, and never
+// the same fault twice inside repeatGapSec — a correction takes ~300 strides to land.
 export class Coach {
   constructor(cfg = CONFIG, enabled = FAULTS.ears) {
     this.cfg = cfg;
     this.enabled = enabled;
-    this.since = {};      // fault -> seconds when we first saw it
+    this.since = {};              // fault -> seconds when it turned persistent
     this.lastCueAt = -Infinity;
     this.lastFault = null;
+    this.cuedAt = {};             // fault -> when we last spoke about it
+    this.hist = [];               // recent metric ticks, cfg.smoothTicks long
+    this.cadenceAll = [];         // whole-session cadence, for the runner's baseline
+    this.swayAll = [];            // whole-session sway, for the per-runner threshold
+  }
+
+  // The smoothed metrics that cue decisions run on.
+  smoothed() {
+    const h = this.hist;
+    const g = k => tmean(h.map(m => m[k]));
+    return { cadence: g('cadence'), bounce: g('bounce'), asymmetry: g('asymmetry'), sway: g('sway') };
   }
 
   faults(m) {
     if (!m.moving) return [];
+    this.hist.push(m);
+    if (this.hist.length > this.cfg.smoothTicks) this.hist.shift();
+    if (m.cadence != null) this.cadenceAll.push(m.cadence);
+    if (m.sway != null) this.swayAll.push(m.sway);
+
+    const s = this.smoothed();
     const f = [];
-    if (m.cadence != null && m.cadence < this.cfg.lowCadence) f.push('cadence');
-    if (m.bounce != null && m.bounce > this.cfg.bounceMax) f.push('bounce');
-    if (m.asymmetry != null && m.asymmetry > this.cfg.asymmetryMax) f.push('asymmetry');
-    if (m.sway != null && m.sway > this.cfg.swayMax) f.push('sway');
+
+    // Relative cadence: 95% of this runner's own session baseline, floored at the
+    // absolute slow zone. The 180 myth is not a target; +5% of your own is.
+    const base = tmean(this.cadenceAll);
+    const cadLimit = Math.max(this.cfg.cadenceFloor,
+      base != null ? base * this.cfg.cadenceDrop : this.cfg.cadenceFloor);
+    if (s.cadence != null && s.cadence < cadLimit) f.push('cadence');
+
+    if (s.bounce != null && s.bounce > this.cfg.bounceMax) f.push('bounce');
+
+    // Sway: per-runner z-score once there is a baseline, fixed fallback before that.
+    let swayLimit = this.cfg.swayMax;
+    if (this.swayAll.length >= 60) {
+      const mu = tmean(this.swayAll);
+      const sd = Math.sqrt(tmean(this.swayAll.map(x => (x - mu) ** 2)) || 0);
+      swayLimit = Math.min(this.cfg.swayMax, mu + this.cfg.swaySD * sd);
+    }
+    if (s.sway != null && s.sway > swayLimit) f.push('sway');
+
+    // Asymmetry last: the weakest injury evidence, so it never outranks the others.
+    if (s.asymmetry != null && s.asymmetry > this.cfg.asymmetryMax) f.push('asymmetry');
+
     return f.filter(k => this.enabled.includes(k));
   }
 
@@ -219,16 +269,18 @@ export class Coach {
     for (const k of Object.keys(this.since)) if (!active.includes(k)) delete this.since[k];
     for (const k of active) if (!(k in this.since)) this.since[k] = now;
 
+    if (now < this.cfg.graceSec) return null;
     if (now - this.lastCueAt < this.cfg.cueGapSec) return null;
 
-    const ripe = active
-      .filter(k => now - this.since[k] >= this.cfg.sustainSec)
-      .sort((a, b) => (a === this.lastFault) - (b === this.lastFault));
+    const ripe = active.filter(k =>
+      now - this.since[k] >= this.cfg.sustainSec &&
+      now - (this.cuedAt[k] ?? -Infinity) >= this.cfg.repeatGapSec);
     if (!ripe.length) return null;
 
-    const fault = ripe[0];
+    const fault = ripe[0];               // faults() already ordered by priority
     this.lastCueAt = now;
     this.lastFault = fault;
+    this.cuedAt[fault] = now;
     delete this.since[fault];
     return { fault, text: CUES[fault] };
   }
