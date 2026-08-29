@@ -82,6 +82,77 @@ everyone can develop the coach on a laptop with no one on the track. Record earl
 
 Skipped GitHub Actions. Add it if a judge asks to see a green tick.
 
+## Tracks
+
+Core and Track A are done. Each remaining track is written so an agent (human or
+Claude) can start cold: goal, files owned, the contract with the rest of the app,
+definition of done. No track edits another track's files. Everyone runs
+`npm run check` before committing — it is under a second.
+
+### Track B — Voice · open
+
+**Goal:** the coach sounds like a coach, not a satnav. ElevenLabs prize.
+
+**Owns:** `voice.js`, `audio/` (new).
+
+**Contract:** `say(text)` and `unlock()` keep their signatures. The cue vocabulary is
+the fixed `CUES` map in `coach.js` — do not grow it without also growing `FAULT_LABEL`
+and `FOCUS`.
+
+**Build:**
+1. Script (Node, one file, run once at build time): call the ElevenLabs TTS API for
+   each string in `CUES`, save `audio/<fault>.mp3`. Commit the mp3s — they are tiny
+   and the run must never depend on the network.
+2. In `voice.js`, prefer the clip: `new Audio('audio/'+fault+'.mp3').play()`, keep
+   `speechSynthesis` as fallback, keep the native `say` bridge as the first branch.
+   `say()` gains an optional second arg `fault` — the app already knows it.
+3. Stretch: two urgency takes per cue, picked by how far past threshold the fault is.
+
+**Done when:** cues on the deployed site play ElevenLabs audio with WiFi off after
+first load, and `npm run check` still passes.
+
+### Track C — Session review & the pitch · open
+
+**Goal:** proof the coaching works, on screen, for judges.
+
+**Owns:** `review.html` (new). Read-only use of `session.js` (`loadRuns`) and
+`coach.js`.
+
+**Contract:** runs live in localStorage under `runs:1|2|3`, shape is in
+`session.js::Session.stop()`. Each run has a per-second `timeline` and a `cues` log.
+
+**Build:**
+1. Page that loads a chosen runner's latest run and renders cadence over time with
+   cue markers, then the headline stat: cadence in the 15s before the first cadence
+   cue vs the 30s after. "Cadence rose N spm after the cue" is the money line.
+2. Team view: all three runners side by side, total km, cue counts.
+3. Owns the demo assets: a screen recording of a live run, and the vlog for the
+   special challenge prize.
+
+**Done when:** `review.html` on the deployed site shows a before/after-cue delta from
+a real recorded run.
+
+### Track D — Calibration · open, highest value per minute
+
+**Goal:** replace every guessed threshold in `CONFIG` with a measured one.
+
+**Owns:** `fixtures/`, threshold values in `coach.js` (values only, not code), and the
+fixture section of `replay.js`.
+
+**Build:**
+1. On the track, record with Record/Export in the app: one good-form lap, one
+   deliberate overstride, one deliberate limp (note which side!), one head-wobble
+   lap in AirPods mode. Both modes where possible. AirDrop the `.jsonl` files into
+   `fixtures/`, named `<mode>-<fault>.jsonl`.
+2. `npm run check` prints metrics and the cue timeline per fixture. Tune `CONFIG`
+   until each fixture triggers its own fault and only its own fault.
+3. Settle the left/right question: the gait sign heuristic in `coach.js::gait` is
+   uncalibrated — the limp fixture tells you if the labels are swapped.
+4. Encode the tuned expectations as asserts in `replay.js` so they cannot regress.
+
+**Done when:** four fixtures are committed and `npm run check` asserts the right cue
+fires on each.
+
 ## Scoring
 
 `FINAL = BUILD(0..35) + KM/2`. Build dominates, but kilometres are free points and
