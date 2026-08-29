@@ -1,81 +1,391 @@
 <!doctype html>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
 <meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#09090b">
 <title>Form Coach</title>
 <style>
-  :root { color-scheme: dark; }
-  * { box-sizing: border-box; }
-  body {
-    margin: 0; min-height: 100svh; background: #0a0a0c; color: #f2f2f4;
-    font: 16px/1.4 -apple-system, system-ui, sans-serif;
-    display: flex; flex-direction: column; padding: max(1rem, env(safe-area-inset-top)) 1rem 1.5rem;
-    -webkit-user-select: none; user-select: none;
-  }
-  h1 { font-size: .8rem; letter-spacing: .18em; text-transform: uppercase; color: #6c6c78; margin: 0 0 auto; font-weight: 600; }
-  button {
-    font: inherit; font-weight: 600; color: inherit; background: #1b1b20;
-    border: 1px solid #2e2e36; border-radius: 14px; padding: 1rem; width: 100%;
-  }
-  button:active { background: #26262e; }
-  #go { background: #2f6df6; border-color: #2f6df6; font-size: 1.15rem; padding: 1.4rem; }
-  #go.on { background: #1b1b20; border-color: #2e2e36; }
-  .seg { flex: 1; padding: .75rem; font-size: .95rem; }
-  .seg.sel { border-color: #2f6df6; color: #fff; background: #16203a; }
-  .seg:disabled { color: #45454f; }
+:root {
+  --bg: #09090b; --card: #17171a; --card2: #1d1d21; --line: #26262b;
+  --ink: #f4f4f5; --dim: #8e8e96; --faint: #5a5a62;
+  --brand: #ff5b14; --brand2: #ff8a3d; --good: #3ddc84; --warn: #ffb020;
+  --r: 18px;
+}
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body { height: 100%; }
+body {
+  margin: 0; background: var(--bg); color: var(--ink);
+  font: 15px/1.45 -apple-system, "SF Pro Text", system-ui, sans-serif;
+  -webkit-user-select: none; user-select: none; overscroll-behavior: none;
+}
 
-  #cue { font-size: 2rem; font-weight: 650; line-height: 1.15; min-height: 4.6rem; margin: 1.5rem 0; }
-  #cue.idle { color: #4a4a55; font-weight: 500; font-size: 1.3rem; }
+/* ---------- chrome ---------- */
+.screen {
+  display: none; flex-direction: column; min-height: 100svh;
+  padding: calc(env(safe-area-inset-top) + 14px) 18px calc(env(safe-area-inset-bottom) + 78px);
+}
+.screen.on { display: flex; }
+#tabbar {
+  position: fixed; inset: auto 0 0 0; display: flex; z-index: 10;
+  background: rgba(13,13,15,.92); -webkit-backdrop-filter: blur(18px); backdrop-filter: blur(18px);
+  border-top: 1px solid var(--line);
+  padding: 8px 8px calc(env(safe-area-inset-bottom) + 6px);
+}
+#tabbar button {
+  flex: 1; background: none; border: 0; color: var(--faint); font: inherit;
+  font-size: 10px; font-weight: 600; letter-spacing: .02em;
+  display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 4px 0;
+}
+#tabbar button svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+#tabbar button.sel { color: var(--brand); }
+.eyebrow { font-size: 10px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: var(--dim); }
+.eyebrow.brand { color: var(--brand); }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: var(--r); padding: 16px; }
+.num { font-weight: 800; letter-spacing: -.04em; font-variant-numeric: tabular-nums; }
+.chip { font-size: 11px; font-weight: 700; padding: 3px 9px; border-radius: 99px; }
+.chip.good { color: var(--good); background: rgba(61,220,132,.12); }
+.chip.bad { color: var(--brand2); background: rgba(255,91,20,.14); }
+button.cta {
+  width: 100%; border: 0; border-radius: 16px; padding: 17px; font: inherit; font-size: 17px;
+  font-weight: 700; color: #fff; background: linear-gradient(180deg, var(--brand2), var(--brand));
+  box-shadow: 0 8px 28px rgba(255,91,20,.35);
+}
+button.ghost {
+  width: 100%; border: 1px solid var(--line); border-radius: 16px; padding: 15px;
+  font: inherit; font-size: 15px; font-weight: 600; color: var(--ink); background: var(--card);
+  display: flex; justify-content: space-between; align-items: center;
+}
+button.ghost span:last-child { color: var(--faint); }
 
-  .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: .6rem; margin-bottom: 1.2rem; }
-  .stat { background: #131318; border: 1px solid #212129; border-radius: 14px; padding: .8rem .7rem; }
-  .stat b { display: block; font-size: 2.1rem; font-weight: 640; font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
-  .stat span { font-size: .68rem; letter-spacing: .1em; text-transform: uppercase; color: #6c6c78; }
-  .stat.bad { border-color: #7a2f2f; background: #1d1214; }
-  .stat.bad b { color: #ff7a6e; }
+/* ---------- 3D AirPod ---------- */
+.pod-stage { perspective: 700px; display: grid; place-items: center; }
+.pod { position: relative; width: 74px; height: 150px; transform-style: preserve-3d; animation: podspin 9s linear infinite; }
+.pod.still { animation: none; transform: rotateY(-24deg) rotateX(6deg); }
+@keyframes podspin { from { transform: rotateY(0) rotateX(6deg); } to { transform: rotateY(360deg) rotateX(6deg); } }
+.pod i { position: absolute; display: block; }
+.pod .head {
+  top: 0; left: 4px; width: 66px; height: 62px; border-radius: 46% 54% 52% 48% / 62% 58% 42% 38%;
+  background: radial-gradient(58% 52% at 34% 28%, #ffffff 0%, #f2f2f4 42%, #cfcfd6 78%, #a9a9b2 100%);
+  box-shadow: inset -6px -8px 14px rgba(0,0,0,.18), inset 4px 6px 10px rgba(255,255,255,.9);
+  transform: translateZ(9px);
+}
+.pod .tip {
+  top: 14px; left: 46px; width: 26px; height: 30px; border-radius: 50%;
+  background: radial-gradient(60% 55% at 38% 32%, #fdfdfe, #d9d9df 70%, #b7b7bf);
+  box-shadow: inset -3px -4px 8px rgba(0,0,0,.22); transform: translateZ(16px) rotate(-18deg);
+}
+.pod .grille {
+  top: 26px; left: 55px; width: 11px; height: 15px; border-radius: 50%;
+  background: radial-gradient(circle at 45% 40%, #3a3a40, #131316 75%);
+  box-shadow: inset 0 1px 2px rgba(255,255,255,.25); transform: translateZ(24px) rotate(-18deg);
+}
+.pod .stem {
+  top: 48px; left: 14px; width: 24px; height: 96px; border-radius: 12px 12px 11px 11px / 14px 14px 18px 18px;
+  background: linear-gradient(105deg, #ffffff 8%, #ececef 38%, #c9c9d1 72%, #9d9da6 96%);
+  box-shadow: inset -4px 0 8px rgba(0,0,0,.16), inset 3px 2px 6px rgba(255,255,255,.85), 0 18px 30px rgba(0,0,0,.45);
+  transform: translateZ(4px);
+}
+.pod .foot {
+  top: 136px; left: 15px; width: 22px; height: 10px; border-radius: 50%;
+  background: radial-gradient(circle at 45% 35%, #e8e8ec, #86868f); transform: translateZ(6px);
+}
+.pod .shadow {
+  top: 158px; left: -4px; width: 84px; height: 16px; border-radius: 50%;
+  background: radial-gradient(closest-side, rgba(0,0,0,.55), transparent 70%); filter: blur(3px);
+}
+.rings { position: absolute; inset: 0; display: grid; place-items: center; pointer-events: none; }
+.rings::before, .rings::after {
+  content: ""; position: absolute; border: 1px solid rgba(255,91,20,.5); border-radius: 50%;
+  width: 120px; height: 120px; animation: ripple 2.6s ease-out infinite;
+}
+.rings::after { animation-delay: 1.3s; }
+@keyframes ripple { from { transform: scale(.55); opacity: .9; } to { transform: scale(1.6); opacity: 0; } }
 
-  .row { display: flex; gap: .6rem; }
-  footer { margin-top: 1rem; font-size: .78rem; color: #55555f; text-align: center; min-height: 1.2rem; }
-  a { color: #55555f; }
+/* ---------- home ---------- */
+#home .hero {
+  position: relative; border-radius: 24px; overflow: hidden; padding: 26px 20px 22px;
+  background:
+    radial-gradient(120% 90% at 85% -10%, rgba(255,91,20,.42), transparent 55%),
+    radial-gradient(90% 70% at -10% 110%, rgba(255,91,20,.18), transparent 60%),
+    linear-gradient(180deg, #141416, #101012);
+  border: 1px solid #2a2a30;
+}
+#home h1 { font-size: 40px; line-height: 1.04; letter-spacing: -.03em; margin: 10px 0 10px; font-weight: 800; }
+#home h1 em { font-style: normal; color: var(--brand); }
+#home .sub { color: var(--dim); max-width: 240px; margin: 0 0 6px; }
+#home .pods-duo { position: relative; display: flex; justify-content: center; gap: 44px; padding: 26px 0 18px; }
+#home .pods-duo .pod-stage:last-child .pod { animation-delay: -4.5s; }
+.connect {
+  display: flex; align-items: center; gap: 10px; background: rgba(23,23,26,.85);
+  border: 1px solid var(--line); border-radius: 14px; padding: 12px 14px; margin: 8px 0 14px;
+}
+.dot { width: 8px; height: 8px; border-radius: 50%; background: var(--good); box-shadow: 0 0 8px var(--good); }
+.dot.off { background: var(--faint); box-shadow: none; }
+.connect b { font-weight: 600; }
+.connect span { margin-left: auto; color: var(--dim); font-size: 13px; }
+
+/* ---------- live run ---------- */
+#run .top { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 4px; }
+#run .live { display: flex; align-items: center; gap: 6px; color: var(--good); font-size: 12px; font-weight: 700; letter-spacing: .06em; }
+#run .live .dot { animation: blink 1.6s infinite; }
+@keyframes blink { 50% { opacity: .25; } }
+#run .mid { text-align: center; }
+#run .mid .t { font-size: 15px; color: var(--ink); font-weight: 600; }
+#run .mid .clock { font-size: 13px; color: var(--dim); font-variant-numeric: tabular-nums; }
+#run .gps { font-size: 12px; color: var(--dim); font-weight: 600; }
+#run .gps.ok { color: var(--good); }
+.dial { position: relative; margin: 4px auto 0; width: min(74vw, 300px); }
+.dial svg { width: 100%; display: block; }
+.dial .val { position: absolute; inset: 0; display: grid; place-content: center; text-align: center; }
+.dial .val .eyebrow { margin-bottom: 2px; }
+.dial .val b { font-size: 74px; line-height: 1; }
+.dial .val .unit { font-size: 13px; font-weight: 700; letter-spacing: .12em; color: var(--dim); }
+.dial .val .target { margin-top: 6px; font-size: 12px; color: var(--brand2); font-weight: 600; }
+#wave { width: 100%; height: 54px; display: block; margin: 2px 0 10px; }
+.stack { display: grid; gap: 10px; }
+.rowcard { display: flex; align-items: center; gap: 14px; }
+.rowcard .big { font-size: 34px; }
+.rowcard .lbl { min-width: 86px; }
+.rowcard canvas { flex: 1; height: 44px; min-width: 0; }
+.balance { display: flex; align-items: center; justify-content: space-around; text-align: center; }
+.balance .side b { font-size: 30px; }
+.balance .side span { display: block; font-size: 11px; color: var(--dim); font-weight: 600; letter-spacing: .08em; text-transform: uppercase; }
+.balance .note { font-size: 11px; color: var(--dim); margin-top: 4px; }
+#cueline { min-height: 22px; text-align: center; color: var(--brand2); font-weight: 600; margin: 8px 0 2px; }
+.controls { display: flex; align-items: center; justify-content: center; gap: 26px; margin-top: 6px; }
+.controls .aux {
+  width: 52px; height: 52px; border-radius: 50%; border: 1px solid var(--line);
+  background: var(--card); color: var(--dim); font-size: 19px; display: grid; place-items: center;
+}
+.controls .aux.on { color: var(--brand); border-color: var(--brand); }
+#stopBtn {
+  width: 76px; height: 76px; border-radius: 50%; border: 0;
+  background: radial-gradient(circle at 35% 30%, var(--brand2), var(--brand));
+  box-shadow: 0 10px 30px rgba(255,91,20,.4); display: grid; place-items: center;
+}
+#stopBtn::before { content: ""; width: 24px; height: 24px; border-radius: 6px; background: #fff; }
+
+/* ---------- analysis ---------- */
+#insights header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+#insights header .h { font-size: 16px; font-weight: 700; }
+#insights header button { background: none; border: 0; color: var(--ink); font-size: 20px; padding: 4px 8px; }
+.herocard {
+  position: relative; overflow: hidden; border-radius: 20px; padding: 18px;
+  background: radial-gradient(130% 130% at 85% 20%, #ff8a3d 0%, #ff5b14 45%, #d63f05 100%);
+  min-height: 148px; display: flex; flex-direction: column; justify-content: center;
+}
+.herocard::before, .herocard::after {
+  content: ""; position: absolute; right: -40px; top: -60px; width: 260px; height: 260px;
+  border: 1px solid rgba(255,255,255,.22); border-radius: 50%;
+}
+.herocard::after { width: 190px; height: 190px; right: -8px; top: -28px; }
+.herocard .eyebrow { color: rgba(255,255,255,.85); }
+.herocard h2 { margin: 6px 0 0; font-size: 23px; line-height: 1.22; font-weight: 800; letter-spacing: -.01em; max-width: 63%; }
+.herocard .pod-stage { position: absolute; right: 2px; top: 50%; transform: translateY(-50%) scale(.72); }
+.herocard.ok { background: radial-gradient(130% 130% at 85% 20%, #34e08a 0%, #17b862 45%, #0c8a47 100%); }
+.focus { display: flex; margin: 10px 0; padding: 0; }
+.focus > div { flex: 1; padding: 14px 16px; }
+.focus > div + div { border-left: 1px solid var(--line); text-align: right; }
+.focus b { display: block; font-size: 16px; margin-top: 3px; font-weight: 700; }
+.focus .delta { color: var(--brand); font-size: 20px; font-weight: 800; }
+.chartcard { margin-bottom: 10px; }
+.chartcard .head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 4px; }
+.chartcard .big { font-size: 26px; }
+.chartcard .big small { font-size: 13px; color: var(--dim); font-weight: 600; margin-left: 3px; }
+.chartcard .vs { text-align: right; font-size: 12px; color: var(--dim); }
+.chartcard .vs b { display: block; font-size: 17px; }
+.chartcard .vs b.up { color: var(--good); }
+.chartcard .vs b.down { color: var(--brand2); }
+.chartcard canvas { width: 100%; height: 96px; display: block; }
+.axis { display: flex; justify-content: space-between; font-size: 10px; color: var(--faint); margin-top: 3px; font-variant-numeric: tabular-nums; }
+.runrow { display: flex; align-items: center; gap: 12px; padding: 13px 2px; border-bottom: 1px solid var(--line); }
+.runrow:last-child { border-bottom: 0; }
+.runrow .sc { width: 44px; height: 44px; border-radius: 12px; display: grid; place-items: center; font-weight: 800; font-size: 17px; background: rgba(255,91,20,.14); color: var(--brand2); }
+.runrow .sc.good { background: rgba(61,220,132,.12); color: var(--good); }
+.runrow .meta { flex: 1; }
+.runrow .meta b { display: block; font-size: 14px; font-weight: 650; }
+.runrow .meta span { font-size: 12px; color: var(--dim); }
+.runrow .arr { color: var(--faint); }
+
+/* ---------- coach / profile ---------- */
+.cue-item { display: flex; gap: 12px; padding: 13px 0; border-bottom: 1px solid var(--line); align-items: baseline; }
+.cue-item:last-child { border-bottom: 0; }
+.cue-item .k { min-width: 118px; font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--brand2); }
+.cue-item .q { color: var(--dim); font-style: italic; }
+.setrow { display: flex; align-items: center; justify-content: space-between; padding: 13px 0; border-bottom: 1px solid var(--line); }
+.setrow:last-child { border-bottom: 0; }
+.seg2 { display: flex; background: var(--card2); border-radius: 10px; padding: 3px; }
+.seg2 button { border: 0; background: none; color: var(--dim); font: inherit; font-size: 13px; font-weight: 600; padding: 6px 13px; border-radius: 8px; }
+.seg2 button.sel { background: var(--brand); color: #fff; }
+.empty { text-align: center; color: var(--faint); padding: 34px 20px; }
 </style>
 
-<h1>Form Coach</h1>
+<!-- ================= HOME ================= -->
+<section class="screen on" id="home">
+  <div class="hero">
+    <div style="font-weight:800;letter-spacing:.26em;font-size:15px">FORM<span style="color:var(--brand)">/</span>COACH</div>
+    <div class="eyebrow brand" style="margin-top:22px">Running Coach</div>
+    <h1>Run better.<br><em>Every run.</em></h1>
+    <p class="sub">Real-time feedback to improve your form and prevent injury.</p>
+    <div class="pods-duo">
+      <div class="pod-stage"><div class="rings"></div><div class="pod"><i class="head"></i><i class="tip"></i><i class="grille"></i><i class="stem"></i><i class="foot"></i><i class="shadow"></i></div></div>
+      <div class="pod-stage"><div class="rings"></div><div class="pod"><i class="head"></i><i class="tip"></i><i class="grille"></i><i class="stem"></i><i class="foot"></i><i class="shadow"></i></div></div>
+    </div>
+  </div>
+  <div class="seg2" id="userSeg" style="margin:14px 0 0;justify-content:stretch">
+    <button data-u="1" style="flex:1">Runner 1</button>
+    <button data-u="2" style="flex:1">Runner 2</button>
+    <button data-u="3" style="flex:1">Runner 3</button>
+  </div>
+  <div class="connect"><span class="dot off" id="podDot"></span><b id="podLabel">Phone sensor ready</b><span id="modeLabel">In hand</span></div>
+  <button class="cta" id="startBtn">&#9654;&#xFE0E;&nbsp; Start Run</button>
+  <div style="height:10px"></div>
+  <button class="ghost" id="historyBtn"><span>Activity History</span><span>&#8250;</span></button>
+</section>
 
-<div id="cue" class="idle">Phone in your hand or an armband. Tap start, then run.</div>
+<!-- ================= LIVE RUN ================= -->
+<section class="screen" id="run">
+  <div class="top">
+    <span class="live"><span class="dot"></span>LIVE</span>
+    <div class="mid"><div class="t" id="runMode">Outdoor Run</div><div class="clock" id="clock">00:00:00</div></div>
+    <span class="gps" id="gps">GPS &#9679;</span>
+  </div>
+  <div class="dial">
+    <svg viewBox="0 0 200 200">
+      <g id="ticks"></g>
+      <path id="arcBg" fill="none" stroke="#232328" stroke-width="7" stroke-linecap="round"/>
+      <path id="arcFg" fill="none" stroke="url(#ag)" stroke-width="7" stroke-linecap="round"/>
+      <defs><linearGradient id="ag" x1="0" y1="1" x2="1" y2="0">
+        <stop offset="0" stop-color="#ff5b14"/><stop offset="1" stop-color="#ffb020"/>
+      </linearGradient></defs>
+    </svg>
+    <div class="val">
+      <div class="eyebrow">Cadence</div>
+      <b class="num" id="cad">—</b>
+      <div class="unit">SPM</div>
+      <div class="target">Target 170–180</div>
+    </div>
+  </div>
+  <canvas id="wave"></canvas>
+  <div class="stack">
+    <div class="card rowcard">
+      <div class="lbl"><div class="eyebrow">Form score</div><span class="chip good" id="scoreChip" hidden></span></div>
+      <b class="num big" id="score">—</b><span style="color:var(--faint);margin-left:-8px">/100</span>
+      <div style="flex:1"></div>
+      <div style="text-align:right"><div class="eyebrow">Distance</div><b class="num" style="font-size:24px" id="dist">0.00</b> <span style="color:var(--dim);font-size:12px">km</span></div>
+    </div>
+    <div class="card rowcard">
+      <div class="lbl"><div class="eyebrow">Impact load</div><b class="num" style="font-size:24px" id="impact">—</b><span style="color:var(--dim);font-size:12px"> g</span></div>
+      <canvas id="impactSpark"></canvas>
+    </div>
+    <div class="card">
+      <div class="eyebrow" style="text-align:center;margin-bottom:8px">Gait balance</div>
+      <div class="balance">
+        <div class="side"><b class="num" id="balL">—</b><span>Left</span></div>
+        <svg width="72" height="72" viewBox="0 0 72 72">
+          <circle cx="36" cy="36" r="28" fill="none" stroke="#232328" stroke-width="9"/>
+          <circle id="balArc" cx="36" cy="36" r="28" fill="none" stroke="var(--brand)" stroke-width="9"
+                  stroke-linecap="round" stroke-dasharray="88 176" transform="rotate(-90 36 36)"/>
+        </svg>
+        <div class="side"><b class="num" id="balR">—</b><span>Right</span></div>
+      </div>
+      <div class="note" style="text-align:center" id="balNote">&nbsp;</div>
+    </div>
+  </div>
+  <div id="cueline">&nbsp;</div>
+  <div class="controls">
+    <button class="aux" id="recBtn" title="record fixture">&#9210;&#xFE0E;</button>
+    <button id="stopBtn"></button>
+    <button class="aux on" id="voiceBtn">&#128266;</button>
+  </div>
+</section>
 
-<div class="grid">
-  <div class="stat" id="s-cadence"><b>—</b><span>Cadence</span></div>
-  <div class="stat" id="s-bounce"><b>—</b><span>Bounce</span></div>
-  <div class="stat" id="s-asym"><b>—</b><span>Balance</span></div>
-  <div class="stat" id="s-sway" hidden><b>—</b><span>Head</span></div>
-</div>
+<!-- ================= INSIGHTS / ANALYSIS ================= -->
+<section class="screen" id="insights">
+  <header>
+    <button id="backBtn">&#8249;</button>
+    <span class="h">Run Analysis · <span style="color:var(--brand)" id="whoAmI">R1</span></span>
+    <button id="shareBtn">&#8593;&#xFE0E;</button>
+  </header>
+  <div id="analysisBody"></div>
+</section>
 
-<div class="row" style="margin-bottom:.6rem">
-  <button class="seg sel" id="m-hand">Phone in hand</button>
-  <button class="seg" id="m-ears" disabled>AirPods</button>
-</div>
+<!-- ================= COACH ================= -->
+<section class="screen" id="coach">
+  <div class="eyebrow brand" style="margin:6px 0 4px">Coach</div>
+  <h2 style="margin:0 0 14px;font-size:26px;letter-spacing:-.02em">What I listen for</h2>
+  <div class="card" id="cueList"></div>
+  <p style="color:var(--faint);font-size:12px;margin-top:14px">
+    One cue at a time. A fault has to persist 8 seconds before I speak, and I never
+    speak twice inside 20 seconds. Head stability is only scored in AirPods mode —
+    from a hand, your arm swing <i>is</i> the lateral motion.
+  </p>
+</section>
 
-<button id="go">Start</button>
-<div class="row" style="margin-top:.6rem">
-  <button id="rec">Record</button>
-  <button id="save" disabled>Export</button>
-</div>
-<footer id="note"></footer>
+<!-- ================= PROFILE ================= -->
+<section class="screen" id="profile">
+  <div class="eyebrow brand" style="margin:6px 0 4px">Profile</div>
+  <h2 style="margin:0 0 14px;font-size:26px;letter-spacing:-.02em">Setup</h2>
+  <div class="card">
+    <div class="setrow"><span>Sensor</span>
+      <div class="seg2"><button id="pm-hand" class="sel">Phone</button><button id="pm-ears">AirPods</button></div>
+    </div>
+    <div class="setrow"><span>Voice cues</span>
+      <div class="seg2"><button id="pv-on" class="sel">On</button><button id="pv-off">Off</button></div>
+    </div>
+    <div class="setrow"><span>AirPods stream</span><span id="podState" style="color:var(--dim)">not detected</span></div>
+    <div class="setrow"><span>Export last recording</span><button class="seg2" style="border:0;color:var(--brand);background:none;font:inherit;font-weight:600" id="exportBtn" disabled>Export</button></div>
+  </div>
+  <p style="color:var(--faint);font-size:12px;margin-top:14px">
+    AirPods mode needs the native app, both pods in, and Automatic Ear Detection turned
+    off in Settings → Bluetooth. Recordings replay through <code>npm run check</code>.
+  </p>
+</section>
+
+<nav id="tabbar">
+  <button data-s="home" class="sel"><svg viewBox="0 0 24 24"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/></svg>Home</button>
+  <button data-s="insights"><svg viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>Insights</button>
+  <button data-s="coach"><svg viewBox="0 0 24 24"><path d="M4 14v-4M8 17V7M12 20V4M16 17V7M20 14v-4"/></svg>Coach</button>
+  <button data-s="profile"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 5-5.5 8-5.5s6.5 1.5 8 5.5"/></svg>Profile</button>
+</nav>
 
 <script type="module">
-import { analyze, Coach, CONFIG, FAULTS } from './coach.js';
+import { analyze, score, Coach, CONFIG, CUES, FAULTS, FAULT_LABEL, FOCUS } from './coach.js';
 import { head, headLive } from './head.js';
 import { say, unlock } from './voice.js';
+import { Session, loadRuns, activeUser, setUser } from './session.js';
 
 const $ = id => document.getElementById(id);
-const note = m => $('note').textContent = m;
+const screens = ['home', 'run', 'insights', 'coach', 'profile'];
+function show(s) {
+  for (const k of screens) $(k).classList.toggle('on', k === s);
+  for (const b of document.querySelectorAll('#tabbar button'))
+    b.classList.toggle('sel', b.dataset.s === s);
+  document.getElementById('tabbar').style.display = s === 'run' ? 'none' : '';
+}
+for (const b of document.querySelectorAll('#userSeg button')) b.onclick = () => {
+  setUser(+b.dataset.u);
+  paintUser();
+};
+function paintUser() {
+  for (const b of document.querySelectorAll('#userSeg button'))
+    b.classList.toggle('sel', +b.dataset.u === activeUser());
+}
+paintUser();
 
-let samples = [];          // rolling window
-let tape = null, recording = false;   // full session when recording
-let coach = null, t0 = 0, running = false, wakeLock = null;
-let mode = 'hand';   // 'hand' = phone IMU, 'ears' = AirPods head IMU via the native shell
+for (const b of document.querySelectorAll('#tabbar button')) b.onclick = () => {
+  show(b.dataset.s);
+  if (b.dataset.s === 'insights') renderAnalysis(shownRun ?? loadRuns()[0], loadRuns());
+};
 
-// --- sensor ---------------------------------------------------------------
+// ---------- state ----------
+let mode = 'hand', voiceOn = true, running = false, coach = null, session = null;
+let shownRun = null;   // which run Insights is displaying
+let samples = [], tape = null, recording = false, t0 = 0, wakeLock = null;
+let lastImpacts = [];
+
+// ---------- sensors ----------
 function onMotion(e) {
   const a = e.acceleration, g = e.accelerationIncludingGravity;
   if (!a || a.x === null || !g) return;
@@ -85,107 +395,307 @@ function onMotion(e) {
   const cutoff = s.t - CONFIG.windowSec * 1000;
   while (samples.length && samples[0].t < cutoff) samples.shift();
 }
-
 head.tap = s => { if (recording && mode === 'ears') tape.push(s); };
 
-// --- loop -----------------------------------------------------------------
-const fmt = (v, d = 0) => v == null ? '—' : v.toFixed(d);
-function paint(m, bad) {
-  $('s-cadence').firstChild.textContent = fmt(m.cadence);
-  $('s-bounce').firstChild.textContent = fmt(m.bounce, 1);
-  $('s-asym').firstChild.textContent = m.asymmetry == null ? '—' : Math.round(100 - m.asymmetry * 100) + '%';
-  $('s-sway').firstChild.textContent = m.sway == null ? '—' : Math.round(100 - m.sway * 100) + '%';
-  for (const [k, id] of [['cadence','s-cadence'],['bounce','s-bounce'],['asymmetry','s-asym'],['sway','s-sway']])
-    $(id).classList.toggle('bad', bad.includes(k));
+// ---------- dial ----------
+const polar = (deg, r) => [100 + r * Math.cos(deg * Math.PI / 180), 100 + r * Math.sin(deg * Math.PI / 180)];
+function arcPath(a0, a1, r) {
+  const [x0, y0] = polar(a0, r), [x1, y1] = polar(a1, r);
+  return `M ${x0} ${y0} A ${r} ${r} 0 ${a1 - a0 > 180 ? 1 : 0} 1 ${x1} ${y1}`;
+}
+const A0 = 135, A1 = 405;   // 270° sweep
+$('arcBg').setAttribute('d', arcPath(A0, A1, 84));
+{ // ticks
+  let t = '';
+  for (let i = 0; i <= 54; i++) {
+    const a = A0 + (A1 - A0) * i / 54, [x0, y0] = polar(a, 92), [x1, y1] = polar(a, i % 9 ? 96 : 99);
+    t += `<line x1="${x0}" y1="${y0}" x2="${x1}" y2="${y1}" stroke="${i % 9 ? '#2a2a30' : '#3c3c44'}" stroke-width="1.5"/>`;
+  }
+  $('ticks').innerHTML = t;
+}
+function setDial(spm) {
+  if (spm == null) { $('arcFg').setAttribute('d', ''); $('cad').textContent = '—'; return; }
+  $('cad').textContent = Math.round(spm);
+  const f = Math.max(0.02, Math.min(1, (spm - 120) / (200 - 120)));
+  $('arcFg').setAttribute('d', arcPath(A0, A0 + (A1 - A0) * f, 84));
 }
 
+// ---------- canvases ----------
+function fitCanvas(c) {
+  const r = c.getBoundingClientRect(), d = devicePixelRatio || 1;
+  if (c.width !== Math.round(r.width * d)) { c.width = Math.round(r.width * d); c.height = Math.round(r.height * d); }
+  return c.getContext('2d');
+}
+function drawWave() {
+  const ctx = fitCanvas($('wave')), { width: W, height: H } = $('wave');
+  ctx.clearRect(0, 0, W, H);
+  const m = analyze(activeSamples());
+  const v = m.vertical ?? [];
+  if (v.length < 4) return;
+  const g = ctx.createLinearGradient(0, 0, W, 0);
+  g.addColorStop(0, 'rgba(255,91,20,.06)'); g.addColorStop(.75, '#ff5b14'); g.addColorStop(1, '#ffb020');
+  ctx.strokeStyle = g; ctx.lineWidth = 2 * (devicePixelRatio || 1); ctx.beginPath();
+  const peak = Math.max(4, ...v.map(Math.abs));
+  v.forEach((y, i) => {
+    const px = i / (v.length - 1) * W, py = H / 2 - y / peak * H * 0.42;
+    i ? ctx.lineTo(px, py) : ctx.moveTo(px, py);
+  });
+  ctx.stroke();
+}
+function drawSpark() {
+  const c = $('impactSpark'), ctx = fitCanvas(c), { width: W, height: H } = c;
+  ctx.clearRect(0, 0, W, H);
+  if (lastImpacts.length < 2) return;
+  const n = lastImpacts.length, top = Math.max(CONFIG.impactMax * 1.4, ...lastImpacts);
+  lastImpacts.forEach((v, i) => {
+    const x = i / (n - 1) * (W - 8) + 4, y = H - 6 - v / top * (H - 14);
+    ctx.fillStyle = v > CONFIG.impactMax ? '#ffb020' : '#3ddc84';
+    ctx.beginPath(); ctx.arc(x, y, 2.4 * (devicePixelRatio || 1), 0, 7); ctx.fill();
+    if (i) { ctx.strokeStyle = 'rgba(255,255,255,.14)'; ctx.beginPath(); ctx.moveTo(px, py); ctx.lineTo(x, y); ctx.stroke(); }
+    var px = x, py = y;
+  });
+}
+
+// ---------- live loop ----------
+const activeSamples = () => mode === 'ears' ? head.samples : samples;
+const fmtClock = s => new Date(s * 1000).toISOString().slice(11, 19);
+
 setInterval(() => {
-  $('m-ears').disabled = !headLive();
-  if (!headLive() && mode === 'ears') setMode('hand');
+  // AirPods presence, everywhere
+  const live = headLive();
+  $('podDot').classList.toggle('off', !live);
+  $('podLabel').textContent = live ? 'AirPods connected' : (mode === 'ears' ? 'AirPods — waiting for stream' : 'Phone sensor ready');
+  $('podState').textContent = live ? 'streaming' : 'not detected';
+  $('pm-ears').disabled = false;
+
   if (!running) return;
-
   const now = (performance.now() - t0) / 1000;
-  const m = analyze(mode === 'ears' ? head.samples : samples);
+  $('clock').textContent = fmtClock(now);
+  $('gps').className = 'gps' + (session.gpsOk ? ' ok' : '');
+  $('dist').textContent = session.km.toFixed(2);
 
-  if (!m.moving) {
-    paint({}, []);
-    $('cue').className = 'idle';
-    $('cue').textContent = m.moving === false && m.fs ? 'Start running.' : 'Waiting for sensor…';
-    return;
+  const m = analyze(activeSamples());
+  drawWave();
+
+  if (!m.moving) { setDial(null); $('score').textContent = '—'; return; }
+
+  const sc = score(m);
+  session.tick(now, m, sc);
+  setDial(m.cadence);
+  $('score').textContent = sc;
+  $('impact').textContent = m.impact?.toFixed(1) ?? '—';
+  if (m.impact != null) { lastImpacts.push(m.impact); lastImpacts = lastImpacts.slice(-40); }
+  drawSpark();
+
+  if (m.balance.left != null) {
+    const L = m.balance.left, R = m.balance.right;
+    $('balL').textContent = Math.round(L) + '%';
+    $('balR').textContent = Math.round(R) + '%';
+    $('balArc').setAttribute('stroke-dasharray', `${L / 100 * 176} 176`);
+    const bias = Math.round(Math.abs(L - 50) * 2);
+    $('balNote').textContent = bias < 4 ? 'Even' : `+${bias}% ${L > 50 ? 'left' : 'right'} bias`;
   }
-
-  const bad = coach.faults(m);
-  paint(m, bad);
 
   const cue = coach.update(m, now);
   if (cue) {
-    $('cue').className = '';
-    $('cue').textContent = cue.text;
-    say(cue.text);
-  } else if (!bad.length) {
-    $('cue').className = 'idle';
-    $('cue').textContent = 'Form looks good.';
+    session.cue(now, cue.fault);
+    $('cueline').textContent = cue.text;
+    if (voiceOn) say(cue.text);
+    setTimeout(() => { if ($('cueline').textContent === cue.text) $('cueline').innerHTML = '&nbsp;'; }, 6000);
   }
 }, 1000);
 
-function setMode(next) {
-  mode = next;
-  $('m-hand').classList.toggle('sel', next === 'hand');
-  $('m-ears').classList.toggle('sel', next === 'ears');
-  $('s-sway').hidden = next !== 'ears';
-  if (coach) coach = new Coach(CONFIG, FAULTS[mode]);   // a fresh sensor means fresh faults
-  note(next === 'ears'
-    ? 'Reading your head. Both pods in, ear detection off.'
-    : 'Reading the phone. Hold it or strap it on.');
-}
-$('m-hand').onclick = () => setMode('hand');
-$('m-ears').onclick = () => setMode('ears');
-
-// --- controls -------------------------------------------------------------
-$('go').onclick = async () => {
-  if (running) {
-    running = false;
-    removeEventListener('devicemotion', onMotion);
-    wakeLock?.release(); wakeLock = null;
-    $('go').textContent = 'Start'; $('go').classList.remove('on');
-    $('cue').className = 'idle'; $('cue').textContent = 'Stopped.';
-    return;
-  }
-
+// ---------- start / stop ----------
+$('startBtn').onclick = async () => {
   if (mode === 'hand' && typeof DeviceMotionEvent?.requestPermission === 'function') {
-    if (await DeviceMotionEvent.requestPermission() !== 'granted')
-      return note('Motion access denied. Settings > Safari > Motion & Orientation Access.');
+    if (await DeviceMotionEvent.requestPermission() !== 'granted') return;
   }
+  unlock();
   try { wakeLock = await navigator.wakeLock.request('screen'); } catch {}
-
-  unlock();                      // iOS only allows speech from a user gesture
-  samples = []; head.samples = []; coach = new Coach(CONFIG, FAULTS[mode]);
+  samples = []; head.samples = []; lastImpacts = [];
+  coach = new Coach(CONFIG, FAULTS[mode]);
+  session = new Session(mode);
   t0 = performance.now(); running = true;
   addEventListener('devicemotion', onMotion);
-  $('go').textContent = 'Stop'; $('go').classList.add('on');
-  note('');
+  $('runMode').textContent = mode === 'ears' ? 'AirPods Run' : 'Outdoor Run';
+  show('run');
+};
+$('stopBtn').onclick = () => {
+  running = false;
+  removeEventListener('devicemotion', onMotion);
+  wakeLock?.release(); wakeLock = null;
+  const run = session.stop();
+  show('insights');                       // visible first: canvases size to zero in a hidden screen
+  renderAnalysis(run, loadRuns());
 };
 
-$('rec').onclick = () => {
+// ---------- record / voice ----------
+$('recBtn').onclick = () => {
   recording = !recording;
   if (recording) tape = [];
-  $('rec').textContent = recording ? 'Recording…' : 'Record';
-  $('save').disabled = recording || !tape?.length;
+  $('recBtn').classList.toggle('on', recording);
+  $('exportBtn').disabled = recording || !tape?.length;
 };
-
-$('save').onclick = () => {
+$('voiceBtn').onclick = () => { voiceOn = !voiceOn; $('voiceBtn').classList.toggle('on', voiceOn); };
+$('exportBtn').onclick = () => {
   const blob = new Blob([tape.map(s => JSON.stringify(s)).join('\n')], { type: 'application/x-ndjson' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download = `run-${new Date().toISOString().slice(11, 19).replace(/:/g, '')}.jsonl`;
+  a.download = `run-${mode}-${new Date().toISOString().slice(11, 19).replace(/:/g, '')}.jsonl`;
   a.click();
-  note(`${tape.length} samples exported — drop it in fixtures/`);
-  tape = null; $('save').disabled = true;
 };
 
-// keep the sensor alive if iOS backgrounds and returns
-addEventListener('visibilitychange', async () => {
-  if (document.visibilityState === 'visible' && running && !wakeLock)
-    try { wakeLock = await navigator.wakeLock.request('screen'); } catch {}
+// ---------- profile ----------
+function setMode(next) {
+  mode = next;
+  $('pm-hand').classList.toggle('sel', next === 'hand');
+  $('pm-ears').classList.toggle('sel', next === 'ears');
+  $('modeLabel').textContent = next === 'ears' ? 'In ears' : 'In hand';
+  if (coach) coach = new Coach(CONFIG, FAULTS[mode]);
+}
+$('pm-hand').onclick = () => setMode('hand');
+$('pm-ears').onclick = () => setMode('ears');
+$('pv-on').onclick = () => { voiceOn = true; $('pv-on').classList.add('sel'); $('pv-off').classList.remove('sel'); };
+$('pv-off').onclick = () => { voiceOn = false; $('pv-off').classList.add('sel'); $('pv-on').classList.remove('sel'); };
+
+// ---------- coach screen ----------
+$('cueList').innerHTML = Object.keys(CUES).map(k =>
+  `<div class="cue-item"><span class="k">${FAULT_LABEL[k]}</span><span class="q">“${CUES[k]}”</span></div>`).join('');
+
+// ---------- analysis ----------
+function chart(canvas, pts, { area = false, bars = false, color = '#ff5b14' } = {}) {
+  const ctx = fitCanvas(canvas), { width: W, height: H } = canvas;
+  ctx.clearRect(0, 0, W, H);
+  const xs = pts.filter(p => p != null);
+  if (xs.length < 2) return;
+  const lo = Math.min(...xs) * 0.9, hi = Math.max(...xs) * 1.06 || 1;
+  const X = i => i / (pts.length - 1) * (W - 6) + 3;
+  const Y = v => H - 4 - (v - lo) / (hi - lo) * (H - 10);
+  if (bars) {
+    const bw = Math.max(3, (W / pts.length) * 0.55);
+    pts.forEach((v, i) => { if (v == null) return;
+      ctx.fillStyle = i % 2 ? color : 'rgba(255,255,255,.22)';
+      ctx.beginPath(); ctx.roundRect(X(i) - bw / 2, Y(v), bw, H - 4 - Y(v), 2); ctx.fill();
+    });
+    return;
+  }
+  ctx.beginPath();
+  pts.forEach((v, i) => { if (v == null) return; const x = X(i), y = Y(v); ctx.lineTo(x, y); });
+  if (area) {
+    const g = ctx.createLinearGradient(0, 0, 0, H);
+    g.addColorStop(0, 'rgba(255,91,20,.4)'); g.addColorStop(1, 'rgba(255,91,20,0)');
+    ctx.save(); ctx.lineTo(W - 3, H - 4); ctx.lineTo(3, H - 4); ctx.closePath(); ctx.fillStyle = g; ctx.fill(); ctx.restore();
+    ctx.beginPath(); pts.forEach((v, i) => { if (v != null) ctx.lineTo(X(i), Y(v)); });
+  }
+  ctx.strokeStyle = color; ctx.lineWidth = 2 * (devicePixelRatio || 1); ctx.stroke();
+}
+
+function bucket(timeline, key, n = 30) {
+  if (!timeline.length) return [];
+  const out = [], per = Math.max(1, Math.ceil(timeline.length / n));
+  for (let i = 0; i < timeline.length; i += per) {
+    const xs = timeline.slice(i, i + per).map(p => p[key]).filter(x => x != null);
+    out.push(xs.length ? xs.reduce((a, b) => a + b) / xs.length : null);
+  }
+  return out;
+}
+
+const podHTML = '<div class="pod-stage"><div class="pod still"><i class="head"></i><i class="tip"></i><i class="grille"></i><i class="stem"></i><i class="foot"></i><i class="shadow"></i></div></div>';
+
+function renderAnalysis(run, history) {
+  shownRun = run;
+  $('whoAmI').textContent = 'R' + activeUser();
+  const el = $('analysisBody');
+  if (!run) {
+    el.innerHTML = `<div class="empty">No runs yet.<br>Your first analysis lands here.</div>` + historyHTML(history);
+    return;
+  }
+  // dominant fault from the cue log, or the win state
+  const counts = {};
+  for (const c of run.cues) counts[c.fault] = (counts[c.fault] ?? 0) + 1;
+  const fault = Object.keys(counts).sort((a, b) => counts[b] - counts[a])[0];
+
+  const prev = history.find(r => r.at !== run.at);
+  const vs = (a, b, invert) => {
+    if (a == null || b == null) return '';
+    const d = ((a - b) / b) * 100;
+    if (Math.abs(d) < 1) return '';
+    const good = invert ? d < 0 : d > 0;
+    return `<div class="vs"><b class="${good ? 'up' : 'down'}">${d > 0 ? '+' : ''}${d.toFixed(0)}%</b>vs last run</div>`;
+  };
+
+  el.innerHTML = `
+    <div class="herocard ${fault ? '' : 'ok'}">
+      <div class="eyebrow">${fault ? FAULT_LABEL[fault] : 'Clean run'}</div>
+      <h2>${fault
+        ? `Fixing ${FAULT_LABEL[fault].toLowerCase()} is your fastest win.`
+        : `No faults held long enough to coach. Keep it up.`}</h2>
+      ${podHTML}
+    </div>
+    <div class="card focus">
+      <div><div class="eyebrow">Suggested focus</div><b>${fault ? FOCUS[fault] : 'Hold this form'}</b></div>
+      <div><div class="eyebrow">Form score</div><b class="delta">${run.score ?? '—'}<small style="font-size:12px;color:var(--faint)">/100</small></b></div>
+    </div>
+    <div class="card chartcard">
+      <div class="head"><div><div class="eyebrow">Impact load over time</div>
+        <span class="big num">${run.impact?.toFixed(1) ?? '—'}<small>g avg</small></span></div>
+        ${vs(run.impact, prev?.impact, true)}</div>
+      <canvas id="ch1"></canvas>
+      <div class="axis"><span>0:00</span><span>${fmtClock(Math.round(run.sec / 2))}</span><span>${fmtClock(run.sec)}</span></div>
+    </div>
+    <div class="card chartcard">
+      <div class="head"><div><div class="eyebrow">Cadence over time</div>
+        <span class="big num">${run.cadence ? Math.round(run.cadence) : '—'}<small>spm avg</small></span></div>
+        ${vs(run.cadence, prev?.cadence, false)}</div>
+      <canvas id="ch2"></canvas>
+      <div class="axis"><span>0:00</span><span>${fmtClock(Math.round(run.sec / 2))}</span><span>${fmtClock(run.sec)}</span></div>
+    </div>
+    ${run.mode === 'ears' ? `
+    <div class="card chartcard">
+      <div class="head"><div><div class="eyebrow">Head stability</div>
+        <span class="big num">${run.sway != null ? Math.round(100 - run.sway * 100) + '<small>%</small>' : '—'}</span></div>
+        <span class="chip ${run.sway != null && run.sway < CONFIG.swayMax ? 'good' : 'bad'}">${run.sway != null && run.sway < CONFIG.swayMax ? 'Steady' : 'Rocking'}</span></div>
+      <canvas id="ch3"></canvas>
+    </div>` : ''}
+    <div class="card" style="margin-bottom:10px">
+      <div class="eyebrow" style="margin-bottom:4px">This run</div>
+      <div style="display:flex;justify-content:space-between;font-size:14px;color:var(--dim)">
+        <span><b class="num" style="color:var(--ink);font-size:18px">${run.km.toFixed(2)}</b> km</span>
+        <span><b class="num" style="color:var(--ink);font-size:18px">${fmtClock(run.sec)}</b></span>
+        <span><b class="num" style="color:var(--ink);font-size:18px">${run.cues.length}</b> cues</span>
+        <span><b class="num" style="color:var(--ink);font-size:18px">${run.mode === 'ears' ? 'AirPods' : 'Phone'}</b></span>
+      </div>
+    </div>
+    ${historyHTML(history)}`;
+
+  chart($('ch1'), bucket(run.timeline, 'impact'), { area: true });
+  chart($('ch2'), bucket(run.timeline, 'cadence'), { bars: true });
+  if (run.mode === 'ears' && $('ch3'))
+    chart($('ch3'), bucket(run.timeline, 'sway').map(v => v == null ? null : 100 - v * 100), { color: '#3ddc84' });
+}
+
+function historyHTML(history) {
+  if (!history.length) return '';
+  return `<div class="card" style="padding:6px 16px"><div class="eyebrow" style="padding:10px 0 2px">Activity history</div>` +
+    history.map((r, i) => `
+      <div class="runrow" data-i="${i}">
+        <div class="sc ${r.score >= 75 ? 'good' : ''}">${r.score ?? '—'}</div>
+        <div class="meta"><b>${r.mode === 'ears' ? 'AirPods' : 'Outdoor'} Run · ${r.km.toFixed(1)} km</b>
+        <span>${new Date(r.at).toLocaleString([], { weekday: 'short', hour: '2-digit', minute: '2-digit' })} · ${fmtClock(r.sec)} · ${r.cues.length} cues</span></div>
+        <span class="arr">&#8250;</span>
+      </div>`).join('') + '</div>';
+}
+$('analysisBody').addEventListener('click', e => {
+  const row = e.target.closest('.runrow');
+  if (!row) return;
+  const h = loadRuns();
+  renderAnalysis(h[+row.dataset.i], h);
+  scrollTo(0, 0);
 });
+
+$('historyBtn').onclick = () => { show('insights'); renderAnalysis(loadRuns()[0], loadRuns()); };
+$('backBtn').onclick = () => show('home');
+$('shareBtn').onclick = () => navigator.share?.({ title: 'Form Coach', url: location.href }).catch(() => {});
+
+// nothing to pre-render: Insights draws when it is shown, because hidden canvases measure 0
 </script>

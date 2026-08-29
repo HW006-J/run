@@ -7,7 +7,7 @@
 // This is how you develop the coach on a laptop while a teammate is on the track.
 
 import { readdirSync, readFileSync } from 'node:fs';
-import { analyze, Coach, CONFIG, FAULTS } from './coach.js';
+import { analyze, Coach, CONFIG, FAULTS, score } from './coach.js';
 
 const G = 9.81;
 
@@ -69,6 +69,21 @@ for (const spm of [155, 170, 185]) {
   const wobble = analyze(synth({ spm: 175, lateral: 1.4 }));
   ok('sway: steady head is under the limit', steady.sway < CONFIG.swayMax, `${steady.sway?.toFixed(3)}`);
   ok('sway: wobbling head is flagged', wobble.sway > CONFIG.swayMax, `${wobble.sway?.toFixed(3)}`);
+}
+
+{
+  const good = score(analyze(synth({ spm: 176, bounce: 9 })));
+  const bad = score(analyze(synth({ spm: 148, bounce: 16, asym: 0.5 })));
+  ok('score: good form scores high', good >= 85, `${good}`);
+  ok('score: bad form scores low', bad <= 50, `${bad}`);
+  ok('score ranks', good > bad, `${good} > ${bad}`);
+}
+
+{
+  const m = analyze(synth({ spm: 175, asym: 0.3 }));
+  const hi = Math.max(m.balance.left, m.balance.right);
+  ok('balance splits toward the hard side', hi > 53 && hi < 70,
+     `${m.balance.left.toFixed(0)}/${m.balance.right.toFixed(0)}`);
 }
 
 ok('standing still is not coached', !analyze(synth({ spm: 170, bounce: 0.3 })).moving);
