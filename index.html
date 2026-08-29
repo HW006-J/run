@@ -58,42 +58,9 @@ button.ghost {
 }
 button.ghost span:last-child { color: var(--faint); }
 
-/* ---------- 3D AirPod ---------- */
-.pod-stage { perspective: 700px; display: grid; place-items: center; }
-.pod { position: relative; width: 74px; height: 150px; transform-style: preserve-3d; animation: podspin 9s linear infinite; }
-.pod.still { animation: none; transform: rotateY(-24deg) rotateX(6deg); }
-@keyframes podspin { from { transform: rotateY(0) rotateX(6deg); } to { transform: rotateY(360deg) rotateX(6deg); } }
-.pod i { position: absolute; display: block; }
-.pod .head {
-  top: 0; left: 4px; width: 66px; height: 62px; border-radius: 46% 54% 52% 48% / 62% 58% 42% 38%;
-  background: radial-gradient(58% 52% at 34% 28%, #ffffff 0%, #f2f2f4 42%, #cfcfd6 78%, #a9a9b2 100%);
-  box-shadow: inset -6px -8px 14px rgba(0,0,0,.18), inset 4px 6px 10px rgba(255,255,255,.9);
-  transform: translateZ(9px);
-}
-.pod .tip {
-  top: 14px; left: 46px; width: 26px; height: 30px; border-radius: 50%;
-  background: radial-gradient(60% 55% at 38% 32%, #fdfdfe, #d9d9df 70%, #b7b7bf);
-  box-shadow: inset -3px -4px 8px rgba(0,0,0,.22); transform: translateZ(16px) rotate(-18deg);
-}
-.pod .grille {
-  top: 26px; left: 55px; width: 11px; height: 15px; border-radius: 50%;
-  background: radial-gradient(circle at 45% 40%, #3a3a40, #131316 75%);
-  box-shadow: inset 0 1px 2px rgba(255,255,255,.25); transform: translateZ(24px) rotate(-18deg);
-}
-.pod .stem {
-  top: 48px; left: 14px; width: 24px; height: 96px; border-radius: 12px 12px 11px 11px / 14px 14px 18px 18px;
-  background: linear-gradient(105deg, #ffffff 8%, #ececef 38%, #c9c9d1 72%, #9d9da6 96%);
-  box-shadow: inset -4px 0 8px rgba(0,0,0,.16), inset 3px 2px 6px rgba(255,255,255,.85), 0 18px 30px rgba(0,0,0,.45);
-  transform: translateZ(4px);
-}
-.pod .foot {
-  top: 136px; left: 15px; width: 22px; height: 10px; border-radius: 50%;
-  background: radial-gradient(circle at 45% 35%, #e8e8ec, #86868f); transform: translateZ(6px);
-}
-.pod .shadow {
-  top: 158px; left: -4px; width: 84px; height: 16px; border-radius: 50%;
-  background: radial-gradient(closest-side, rgba(0,0,0,.55), transparent 70%); filter: blur(3px);
-}
+/* ---------- 3D AirPods (three.js) ---------- */
+.pods3d { width: 100%; height: 210px; }
+.pod-slot { width: 130px; height: 140px; }
 .rings { position: absolute; inset: 0; display: grid; place-items: center; pointer-events: none; }
 .rings::before, .rings::after {
   content: ""; position: absolute; border: 1px solid rgba(255,91,20,.5); border-radius: 50%;
@@ -219,6 +186,10 @@ button.ghost span:last-child { color: var(--faint); }
 .seg2 button { border: 0; background: none; color: var(--dim); font: inherit; font-size: 13px; font-weight: 600; padding: 6px 13px; border-radius: 8px; }
 .seg2 button.sel { background: var(--brand); color: #fff; }
 .empty { text-align: center; color: var(--faint); padding: 34px 20px; }
+.ic svg, .aux svg, .icbtn svg { width: 20px; height: 20px; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; vertical-align: -4px; }
+.cta .ic svg { width: 17px; height: 17px; margin-right: 8px; vertical-align: -2.5px; }
+.ic.dim { color: var(--faint); }
+#insights header .icbtn { background: none; border: 0; color: var(--ink); padding: 4px 8px; }
 </style>
 
 <!-- ================= HOME ================= -->
@@ -228,10 +199,7 @@ button.ghost span:last-child { color: var(--faint); }
     <div class="eyebrow brand" style="margin-top:22px">Running Coach</div>
     <h1>Run better.<br><em>Every run.</em></h1>
     <p class="sub">Real-time feedback to improve your form and prevent injury.</p>
-    <div class="pods-duo">
-      <div class="pod-stage"><div class="rings"></div><div class="pod"><i class="head"></i><i class="tip"></i><i class="grille"></i><i class="stem"></i><i class="foot"></i><i class="shadow"></i></div></div>
-      <div class="pod-stage"><div class="rings"></div><div class="pod"><i class="head"></i><i class="tip"></i><i class="grille"></i><i class="stem"></i><i class="foot"></i><i class="shadow"></i></div></div>
-    </div>
+    <div class="pods3d" id="homePods"></div>
   </div>
   <div class="seg2" id="userSeg" style="margin:14px 0 0;justify-content:stretch">
     <button data-u="1" style="flex:1">Runner 1</button>
@@ -239,9 +207,9 @@ button.ghost span:last-child { color: var(--faint); }
     <button data-u="3" style="flex:1">Runner 3</button>
   </div>
   <div class="connect"><span class="dot off" id="podDot"></span><b id="podLabel">Phone sensor ready</b><span id="modeLabel">In hand</span></div>
-  <button class="cta" id="startBtn">&#9654;&#xFE0E;&nbsp; Start Run</button>
+  <button class="cta" id="startBtn"><span class="ic"></span>Start Run</button>
   <div style="height:10px"></div>
-  <button class="ghost" id="historyBtn"><span>Activity History</span><span>&#8250;</span></button>
+  <button class="ghost" id="historyBtn"><span>Activity History</span><span class="ic dim"></span></button>
 </section>
 
 <!-- ================= LIVE RUN ================= -->
@@ -295,18 +263,18 @@ button.ghost span:last-child { color: var(--faint); }
   </div>
   <div id="cueline">&nbsp;</div>
   <div class="controls">
-    <button class="aux" id="recBtn" title="record fixture">&#9210;&#xFE0E;</button>
+    <button class="aux" id="recBtn" title="record fixture"></button>
     <button id="stopBtn"></button>
-    <button class="aux on" id="voiceBtn">&#128266;</button>
+    <button class="aux on" id="voiceBtn"></button>
   </div>
 </section>
 
 <!-- ================= INSIGHTS / ANALYSIS ================= -->
 <section class="screen" id="insights">
   <header>
-    <button id="backBtn">&#8249;</button>
+    <button id="backBtn" class="icbtn"></button>
     <span class="h">Run Analysis · <span style="color:var(--brand)" id="whoAmI">R1</span></span>
-    <button id="shareBtn">&#8593;&#xFE0E;</button>
+    <button id="shareBtn" class="icbtn"></button>
   </header>
   <div id="analysisBody"></div>
 </section>
@@ -351,6 +319,14 @@ button.ghost span:last-child { color: var(--faint); }
 </nav>
 
 <script type="module">
+const ICON = {
+  play:   '<svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M8 5.5v13a.6.6 0 0 0 .9.5l10.4-6.5a.6.6 0 0 0 0-1L8.9 5a.6.6 0 0 0-.9.5z"/></svg>',
+  chev:   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="m9 5 7 7-7 7"/></svg>',
+  back:   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="m15 5-7 7 7 7"/></svg>',
+  share:  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 15V4m0 0 -4 4m4-4 4 4"/><path d="M5 12v7a1.5 1.5 0 0 0 1.5 1.5h11A1.5 1.5 0 0 0 19 19v-7"/></svg>',
+  record: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="3.5" fill="currentColor" stroke="none"/></svg>',
+  sound:  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M4 9.5v5h3.5L12 18.5v-13L7.5 9.5H4z" fill="currentColor" stroke="none"/><path d="M15.5 9a4.2 4.2 0 0 1 0 6M18 6.6a7.6 7.6 0 0 1 0 10.8"/></svg>',
+};
 import { analyze, score, Coach, CONFIG, CUES, FAULTS, FAULT_LABEL, FOCUS } from './coach.js';
 import { head, headLive } from './head.js';
 import { say, unlock } from './voice.js';
@@ -500,7 +476,7 @@ setInterval(() => {
   if (cue) {
     session.cue(now, cue.fault);
     $('cueline').textContent = cue.text;
-    if (voiceOn) say(cue.text);
+    if (voiceOn) say(cue.text, cue.fault);
     setTimeout(() => { if ($('cueline').textContent === cue.text) $('cueline').innerHTML = '&nbsp;'; }, 6000);
   }
 }, 1000);
@@ -600,7 +576,7 @@ function bucket(timeline, key, n = 30) {
   return out;
 }
 
-const podHTML = '<div class="pod-stage"><div class="pod still"><i class="head"></i><i class="tip"></i><i class="grille"></i><i class="stem"></i><i class="foot"></i><i class="shadow"></i></div></div>';
+const podHTML = '<div class="pod-slot" id="heroPod"></div>';
 
 function renderAnalysis(run, history) {
   shownRun = run;
@@ -608,6 +584,7 @@ function renderAnalysis(run, history) {
   const el = $('analysisBody');
   if (!run) {
     el.innerHTML = `<div class="empty">No runs yet.<br>Your first analysis lands here.</div>` + historyHTML(history);
+    for (const a of el.querySelectorAll('.arr')) a.innerHTML = ICON.chev;
     return;
   }
   // dominant fault from the cue log, or the win state
@@ -668,6 +645,8 @@ function renderAnalysis(run, history) {
     </div>
     ${historyHTML(history)}`;
 
+  for (const a of el.querySelectorAll('.arr')) a.innerHTML = ICON.chev;
+  if ($('heroPod')) window.__mountHeroPod($('heroPod'));
   chart($('ch1'), bucket(run.timeline, 'impact'), { area: true });
   chart($('ch2'), bucket(run.timeline, 'cadence'), { bars: true });
   if (run.mode === 'ears' && $('ch3'))
@@ -682,7 +661,7 @@ function historyHTML(history) {
         <div class="sc ${r.score >= 75 ? 'good' : ''}">${r.score ?? '—'}</div>
         <div class="meta"><b>${r.mode === 'ears' ? 'AirPods' : 'Outdoor'} Run · ${r.km.toFixed(1)} km</b>
         <span>${new Date(r.at).toLocaleString([], { weekday: 'short', hour: '2-digit', minute: '2-digit' })} · ${fmtClock(r.sec)} · ${r.cues.length} cues</span></div>
-        <span class="arr">&#8250;</span>
+        <span class="arr ic dim"></span>
       </div>`).join('') + '</div>';
 }
 $('analysisBody').addEventListener('click', e => {
@@ -696,6 +675,22 @@ $('analysisBody').addEventListener('click', e => {
 $('historyBtn').onclick = () => { show('insights'); renderAnalysis(loadRuns()[0], loadRuns()); };
 $('backBtn').onclick = () => show('home');
 $('shareBtn').onclick = () => navigator.share?.({ title: 'Form Coach', url: location.href }).catch(() => {});
+
+// icons
+$('startBtn').querySelector('.ic').innerHTML = ICON.play;
+$('historyBtn').querySelector('.ic').innerHTML = ICON.chev;
+$('recBtn').innerHTML = ICON.record;
+$('voiceBtn').innerHTML = ICON.sound;
+$('backBtn').innerHTML = ICON.back;
+$('shareBtn').innerHTML = ICON.share;
+
+// 3D pods — decorative, so a WebGL failure must never take the app down
+let heroPodStop = null;
+window.__mountHeroPod = () => {};
+import('./pods3d.js').then(({ mountPods }) => {
+  mountPods($('homePods'), { count: 2 });
+  window.__mountHeroPod = el => { heroPodStop?.(); heroPodStop = mountPods(el, { count: 1 }); };
+}).catch(() => {});
 
 // nothing to pre-render: Insights draws when it is shown, because hidden canvases measure 0
 </script>

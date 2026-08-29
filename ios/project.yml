@@ -14,6 +14,9 @@ targets:
       - { path: ../voice.js,   buildPhase: resources }
       - { path: ../head.js,    buildPhase: resources }
       - { path: ../session.js, buildPhase: resources }
+      - { path: ../pods3d.js,  buildPhase: resources }
+      - { path: ../vendor,     buildPhase: resources, type: folder }
+      - { path: ../audio,      buildPhase: resources, type: folder }
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: app.formcoach.FormCoach

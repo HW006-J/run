@@ -1,21 +1,26 @@
-// The only thing that makes noise. Track B owns this file; nothing else needs to change.
+// The only thing that makes noise.
 //
-// Now: speechSynthesis. Free, offline, already on the phone.
-// Next: pre-render each CUES string to an ElevenLabs mp3 once, ship them in audio/,
-// and play the clip. The cue vocabulary is fixed and tiny, so there is never an
-// API call mid-run and it still works with no signal on the back straight.
+// Priority: ElevenLabs clip (pre-rendered at build time, offline after first load)
+// -> native AVSpeechSynthesizer (survives a locked screen) -> speechSynthesis.
+// The cue vocabulary is fixed, so the clips are a complete lookup table.
 
-// The native shell speaks through AVSpeechSynthesizer instead: it ducks under music,
-// keeps playing with the screen off, and does not depend on WKWebView's patchy
-// speechSynthesis support.
 const native = () => window.webkit?.messageHandlers?.say;
 
+const clips = {};
+for (const fault of ['cadence', 'bounce', 'asymmetry', 'sway']) {
+  const a = new Audio(`audio/${fault}.mp3`);
+  a.preload = 'auto';
+  clips[fault] = a;
+}
+
 export function unlock() {
+  // iOS unlocks audio per user gesture; prime one muted clip and speech both
+  try { const a = clips.cadence; a.muted = true; a.play().then(() => { a.pause(); a.currentTime = 0; a.muted = false; }).catch(() => {}); } catch {}
   if (native()) return;
   try { speechSynthesis.speak(new SpeechSynthesisUtterance('')); } catch {}
 }
 
-export function say(text) {
+function fallback(text) {
   const n = native();
   if (n) { n.postMessage(text); return; }
   try {
@@ -24,4 +29,14 @@ export function say(text) {
     u.rate = 1.05;
     speechSynthesis.speak(u);
   } catch {}
+}
+
+export function say(text, fault) {
+  const clip = clips[fault];
+  if (clip) {
+    clip.currentTime = 0;
+    clip.play().catch(() => fallback(text));
+    return;
+  }
+  fallback(text);
 }
