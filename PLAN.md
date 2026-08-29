@@ -82,59 +82,6 @@ everyone can develop the coach on a laptop with no one on the track. Record earl
 
 Skipped GitHub Actions. Add it if a judge asks to see a green tick.
 
-## Tracks
-
-The core is done, so these run in parallel. Each owns its own files. The only shared
-file is `index.html`, and each track touches at most two lines of it.
-
-### Track A — AirPods · built, see ios/
-
-The reason the project exists.
-
-`CMHeadphoneMotionManager` delivers motion from **one bud at a time**. `sensorLocation`
-tells you which, and the system switches based on in-ear state. There is no parallel
-left/right stream, so "one AirPod in each hand" cannot work as two sensors. Two
-positions that do:
-
-- **Ears** — head IMU. Head bob, lateral sway, torso stability. Nothing else on the
-  market coaches from the head.
-- **Hand** — AirPods in the ears for audio, phone gripped in one hand for arm swing.
-  Cross-body arm swing is a real, common, correctable fault.
-
-Build: a SwiftUI app that is a `WKWebView` pointed at the deployed URL, plus
-`CMHeadphoneMotionManager` feeding samples in through `evaluateJavaScript`. Roughly
-100 lines. It adds a sensor; it does not reimplement anything.
-
-Contract: call `window.__head(sample)` with the same `{t,ax,ay,az,gx,gy,gz}` shape.
-Add `head.js` to merge that stream. One `<script>` tag in `index.html`.
-
-First: turn **off** Automatic Ear Detection, or the motion stream dies the moment a
-pod leaves an ear.
-
-### Track B — Voice
-
-Owns `voice.js` and `audio/`.
-
-Pre-render each string in `CUES` to an ElevenLabs mp3 **once**, at build time, and
-ship them. The vocabulary is fixed and tiny, so there is no API call during a run and
-it works with no signal. Keep `speechSynthesis` as the fallback.
-
-Then make it good: coach personality, urgency that scales with how bad the fault is,
-ducking under music. This is the ElevenLabs prize and the cue vocabulary is already
-the right shape for it.
-
-### Track C — Session review and the pitch
-
-Owns `review.html`.
-
-Load an exported `.jsonl` and show the run back: cadence over time, where each cue
-fired, a form score, and whether the runner actually responded to a correction.
-"Your cadence rose 9 spm after the first cue" is the single most convincing thing we
-can put in front of a judge, because it shows the coaching *worked*.
-
-Also owns the demo: screen recording of the phone mid-lap, and the vlog for the
-special challenge.
-
 ## Scoring
 
 `FINAL = BUILD(0..35) + KM/2`. Build dominates, but kilometres are free points and
